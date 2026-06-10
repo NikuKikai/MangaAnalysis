@@ -1,6 +1,6 @@
 import type { Point, RoiRect, SimulationSettings } from "../../types/simulation";
 
-const MODEL_SIZE = 768;
+const MODEL_SIZE = 512;
 const CHANNEL_COUNT = 3;
 const INPUT_ELEMENT_COUNT = MODEL_SIZE * MODEL_SIZE * CHANNEL_COUNT;
 

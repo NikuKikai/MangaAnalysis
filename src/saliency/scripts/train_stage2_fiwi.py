@@ -10,7 +10,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="configs/saliency/stage2_fiwi_quick.toml",
+        default="configs/saliency/stage2_fiwi_density_v1.toml",
         help="Path to the stage 2 config file.",
     )
     args = parser.parse_args()

@@ -10,7 +10,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
-        default="configs/saliency/stage1_salicon_quick.toml",
+        default="configs/saliency/stage1_salicon_pretrained_v1.toml",
         help="Path to the stage 1 config file.",
     )
     args = parser.parse_args()

@@ -12,7 +12,7 @@ from .config import Config
 from .datasets import FiWIDataset, SaliconDataset, build_fiwi_splits
 from .losses import CombinedSaliencyLoss
 from .metrics import cc_metric, kld_metric, mse_metric
-from .model import SaliencyUNet
+from .model import create_model_from_config
 from .utils import dump_json, ensure_dir, save_loss_curve, save_prediction_triptych, set_seed
 
 
@@ -83,11 +83,8 @@ def create_loaders(config: Config) -> tuple[DataLoader, DataLoader, DataLoader |
     return train_loader, val_loader, test_loader
 
 
-def create_model(config: Config) -> SaliencyUNet:
-    model = SaliencyUNet(
-        encoder_pretrained=config.model.encoder_pretrained,
-        base_channels=config.model.base_channels,
-    )
+def create_model(config: Config):
+    model = create_model_from_config(config.model)
     if config.training.init_checkpoint and Path(config.training.init_checkpoint).exists():
         checkpoint = torch.load(config.training.init_checkpoint, map_location="cpu")
         model.load_state_dict(checkpoint["model"])
@@ -202,10 +199,19 @@ def train(config: Config, config_path: str) -> dict[str, dict[str, float]]:
     model = create_model(config).to(device)
     baseline_model = None
     if config.training.compare_checkpoint and Path(config.training.compare_checkpoint).exists():
-        baseline_model = SaliencyUNet(
-            encoder_pretrained=False,
-            base_channels=config.model.base_channels,
-        ).to(device)
+        if config.training.compare_architecture_name is not None:
+            baseline_model_config = type(
+                "ModelConfigProxy",
+                (),
+                {
+                    "encoder_pretrained": False,
+                    "base_channels": config.model.base_channels,
+                    "architecture_name": config.training.compare_architecture_name,
+                },
+            )()
+            baseline_model = create_model_from_config(baseline_model_config).to(device)
+        else:
+            baseline_model = create_model_from_config(config.model).to(device)
         checkpoint = torch.load(config.training.compare_checkpoint, map_location=device)
         baseline_model.load_state_dict(checkpoint["model"])
     criterion = CombinedSaliencyLoss(config.loss.kld_weight, config.loss.bce_weight, config.loss.mse_weight)

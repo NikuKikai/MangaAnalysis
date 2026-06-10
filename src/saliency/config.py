@@ -38,6 +38,7 @@ class LoaderConfig:
 class ModelConfig:
     encoder_pretrained: bool
     base_channels: int
+    architecture_name: str = "v1"
     freeze_stages: int = 0
 
 
@@ -56,6 +57,7 @@ class TrainingConfig:
     eval_interval_steps: int = 100
     init_checkpoint: str | None = None
     compare_checkpoint: str | None = None
+    compare_architecture_name: str | None = None
 
 
 @dataclass(slots=True)

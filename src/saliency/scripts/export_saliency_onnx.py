@@ -12,7 +12,7 @@ import torch
 from torch import nn
 
 from saliency.config import load_config
-from saliency.model import SaliencyUNet
+from saliency.model import create_model_from_config
 
 
 # Keep these names stable for the WebGPU client and shader pipeline.
@@ -34,19 +34,28 @@ def parse_args() -> argparse.Namespace:
         description="Export the saliency checkpoint to ONNX for web inference.",
     )
     parser.add_argument(
+        "run_dir",
+        nargs="?",
+        default="runs/saliency/stage1_salicon_pretrained_512_v2",
+        help="Run directory that contains config.toml and checkpoints/.",
+    )
+    parser.add_argument(
+        "epoch",
+        nargs="?",
+        type=int,
+        help="Checkpoint epoch number inside the run directory. Defaults to the latest checkpoint.",
+    )
+    parser.add_argument(
         "--config",
-        default="configs/saliency/stage1_salicon_gpu_pretrained.toml",
-        help="Path to the model config file.",
+        help="Optional explicit config path. Defaults to <run_dir>/config.toml.",
     )
     parser.add_argument(
         "--checkpoint",
-        default="runs/saliency/stage1_salicon_gpu_pretrained/checkpoints/epoch_004.pt",
-        help="Path to the checkpoint file.",
+        help="Optional explicit checkpoint path. Overrides run_dir checkpoint discovery.",
     )
     parser.add_argument(
         "--output-dir",
-        default="runs/saliency/stage1_salicon_gpu_pretrained/onnx",
-        help="Directory for exported ONNX files.",
+        help="Optional explicit output directory. Defaults to <run_dir>/onnx.",
     )
     parser.add_argument(
         "--opset",
@@ -62,15 +71,51 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_config_path(run_dir: Path, config_override: str | None) -> Path:
+    if config_override is not None:
+        return Path(config_override).resolve()
+    return (run_dir / "config.toml").resolve()
+
+
+def resolve_output_dir(run_dir: Path, output_dir_override: str | None) -> Path:
+    if output_dir_override is not None:
+        return Path(output_dir_override).resolve()
+    return (run_dir / "onnx").resolve()
+
+
+def resolve_checkpoint_path(
+    run_dir: Path,
+    epoch: int | None,
+    checkpoint_override: str | None,
+) -> Path:
+    if checkpoint_override is not None:
+        return Path(checkpoint_override).resolve()
+
+    checkpoints_dir = run_dir / "checkpoints"
+    checkpoint_paths = sorted(checkpoints_dir.glob("epoch_*.pt"))
+    if not checkpoint_paths:
+        raise FileNotFoundError(f"No checkpoint files found in: {checkpoints_dir}")
+
+    if epoch is None:
+        return checkpoint_paths[-1].resolve()
+
+    for checkpoint_path in checkpoint_paths:
+        try:
+            checkpoint_epoch = int(checkpoint_path.stem.split("_")[-1])
+        except ValueError:
+            continue
+        if checkpoint_epoch == epoch:
+            return checkpoint_path.resolve()
+
+    raise FileNotFoundError(f"Checkpoint for epoch {epoch} not found in: {checkpoints_dir}")
+
+
 def build_model(config_path: str, checkpoint_path: str) -> tuple[nn.Module, int]:
     config = load_config(config_path)
 
     # Do not request pretrained encoder weights during export.
     # The checkpoint already contains the trained encoder parameters we need.
-    model = SaliencyUNet(
-        encoder_pretrained=False,
-        base_channels=config.model.base_channels,
-    )
+    model = create_model_from_config(config.model)
     checkpoint = torch.load(checkpoint_path, map_location="cpu")
     state_dict = checkpoint["model"] if isinstance(checkpoint, dict) and "model" in checkpoint else checkpoint
     model.load_state_dict(state_dict)
@@ -139,17 +184,24 @@ def export_int8_model(fp32_path: Path, int8_path: Path) -> None:
 
 def main() -> None:
     args = parse_args()
-    output_dir = Path(args.output_dir).resolve()
+    run_dir = Path(args.run_dir).resolve()
+    config_path = resolve_config_path(run_dir, args.config)
+    checkpoint_path = resolve_checkpoint_path(run_dir, args.epoch, args.checkpoint)
+    output_dir = resolve_output_dir(run_dir, args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    model, input_size = build_model(args.config, args.checkpoint)
+    model, input_size = build_model(str(config_path), str(checkpoint_path))
 
-    name_prefix = f"saliency_stage1_{input_size}_sigmoid"
+    run_name = output_dir.parent.name
+    name_prefix = f"{run_name}_sigmoid"
     fp32_path = output_dir / f"{name_prefix}_fp32.onnx"
     fp16_path = output_dir / f"{name_prefix}_fp16.onnx"
     int8_path = output_dir / f"{name_prefix}_int8.onnx"
 
     export_fp32_model(model, input_size, fp32_path, args.opset)
+    print(f"Run directory: {run_dir}")
+    print(f"Config path: {config_path}")
+    print(f"Checkpoint path: {checkpoint_path}")
     print(f"Exported FP32 ONNX to: {fp32_path}")
     print(f"Input name: {INPUT_NAME}")
     print(f"Output name: {OUTPUT_NAME}")

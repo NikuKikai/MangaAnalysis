@@ -1,7 +1,8 @@
 import * as ort from "onnxruntime-web";
 import ortWasmJsepUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 
-const fp16ModelUrl = `${import.meta.env.BASE_URL}models/saliency_stage1_768_sigmoid_fp16.onnx`;
+const MODEL_SIZE = 512;
+const fp16ModelUrl = `${import.meta.env.BASE_URL}models/saliency_stage1_v2_512_sigmoid_fp16.onnx`;
 
 export class SaliencySession {
   private constructor(private readonly session: ort.InferenceSession) {}
@@ -45,7 +46,7 @@ export class SaliencySession {
   }
 
   async predict(input: Float32Array): Promise<Float32Array> {
-    const tensor = new ort.Tensor("float32", input, [1, 3, 768, 768]);
+    const tensor = new ort.Tensor("float32", input, [1, 3, MODEL_SIZE, MODEL_SIZE]);
     const output = await this.session.run({ input_image: tensor });
     const saliency = output.saliency_map.data;
     return saliency instanceof Float32Array ? saliency : Float32Array.from(saliency);
