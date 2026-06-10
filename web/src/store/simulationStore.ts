@@ -13,11 +13,11 @@ import type {
 } from "../types/simulation";
 
 const defaultSettings: SimulationSettings = {
-  maxBlurStrength: 16,
+  maxBlurStrength: 7,
   clearRadiusRatio: 0.06,
-  clickRoiHalfSizeRatio: 0.2,
+  clickRoiHalfSizeRatio: 0.25,
   historySigmaRatio: 0.047,
-  historyAlpha: 2,
+  historyAlpha: 3,
   distanceSigmaRatio: 0.183,
   thresholdRatio: 0.55,
   nmsRadiusRatio: 0.013,

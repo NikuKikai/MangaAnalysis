@@ -46,7 +46,7 @@ export function drawPreprocessPreview(params: {
     return;
   }
 
-  const imageData = new ImageData(preview, previewSize, previewSize);
+  const imageData = new ImageData(new Uint8ClampedArray(preview), previewSize, previewSize);
   const scratchCanvas = document.createElement("canvas");
   scratchCanvas.width = previewSize;
   scratchCanvas.height = previewSize;

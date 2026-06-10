@@ -226,7 +226,7 @@ export function App() {
                 height: 0,
               } satisfies ImageRect),
         roiRect:
-          imageRect && currentRoi
+          imageRect && currentRoi && image
             ? (() => {
                 const roiRect = roiToScreenRect(currentRoi, imageRect, image.width, image.height);
                 return {
