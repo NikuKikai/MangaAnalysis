@@ -21,7 +21,12 @@ class UpBlockV1(nn.Module):
 class SaliencyUNetV1(BaseSaliencyUNet):
     architecture_name = "v1"
 
-    def __init__(self, encoder_pretrained: bool = False, base_channels: int = 64) -> None:
+    def __init__(
+        self,
+        encoder_pretrained: bool = False,
+        base_channels: int = 64,
+        width_mult: float = 1.0,
+    ) -> None:
         super().__init__()
         weights = ResNet18_Weights.DEFAULT if encoder_pretrained else None
         backbone = resnet18(weights=weights)

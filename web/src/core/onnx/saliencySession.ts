@@ -1,8 +1,8 @@
 import * as ort from "onnxruntime-web";
-import ortWasmJsepUrl from "onnxruntime-web/ort-wasm-simd-threaded.jsep.wasm?url";
 
 const MODEL_SIZE = 512;
-const fp16ModelUrl = `${import.meta.env.BASE_URL}models/saliency_stage1_v2_512_sigmoid_fp16.onnx`;
+const fp16ModelUrl = `${import.meta.env.BASE_URL}models/stage1_salicon_pretrained_512_v2w075_sigmoid_fp16.onnx`;
+const ortWasmJsepUrl = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0/dist/ort-wasm-simd-threaded.jsep.wasm";
 
 export class SaliencySession {
   private constructor(private readonly session: ort.InferenceSession) {}

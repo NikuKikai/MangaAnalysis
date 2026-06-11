@@ -40,7 +40,12 @@ class UpBlockV2(nn.Module):
 class SaliencyUNetV2(BaseSaliencyUNet):
     architecture_name = "v2"
 
-    def __init__(self, encoder_pretrained: bool = False, base_channels: int = 32) -> None:
+    def __init__(
+        self,
+        encoder_pretrained: bool = False,
+        base_channels: int = 32,
+        width_mult: float = 1.0,
+    ) -> None:
         super().__init__()
         weights = ResNet18_Weights.DEFAULT if encoder_pretrained else None
         backbone = resnet18(weights=weights)
@@ -51,14 +56,20 @@ class SaliencyUNetV2(BaseSaliencyUNet):
         self.layer3 = backbone.layer3
         self.layer4 = backbone.layer4
 
-        self.bridge = SingleConv(512, 256)
-        self.up4 = UpBlockV2(256, 256, 256, 128, 128)
-        self.up3 = UpBlockV2(128, 128, 128, 64, 64)
-        self.up2 = UpBlockV2(64, 64, 64, 32, 32)
-        self.up1 = UpBlockV2(32, 64, 32, 32, base_channels)
+        bridge_channels = max(32, int(round(256 * width_mult / 8.0)) * 8)
+        up4_channels = max(32, int(round(128 * width_mult / 8.0)) * 8)
+        up3_channels = max(16, int(round(64 * width_mult / 8.0)) * 8)
+        up2_channels = max(16, int(round(32 * width_mult / 8.0)) * 8)
+        up1_channels = max(16, int(round(base_channels * width_mult / 8.0)) * 8)
+
+        self.bridge = SingleConv(512, bridge_channels)
+        self.up4 = UpBlockV2(bridge_channels, 256, bridge_channels, up4_channels, up4_channels)
+        self.up3 = UpBlockV2(up4_channels, 128, up4_channels, up3_channels, up3_channels)
+        self.up2 = UpBlockV2(up3_channels, 64, up3_channels, up2_channels, up2_channels)
+        self.up1 = UpBlockV2(up2_channels, 64, up2_channels, up1_channels, up1_channels)
         self.head = nn.Sequential(
-            SingleConv(base_channels, base_channels),
-            nn.Conv2d(base_channels, 1, kernel_size=1),
+            SingleConv(up1_channels, up1_channels),
+            nn.Conv2d(up1_channels, 1, kernel_size=1),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

@@ -18,4 +18,5 @@ def create_model_from_config(model_config) -> object:
     return builder(
         encoder_pretrained=model_config.encoder_pretrained,
         base_channels=model_config.base_channels,
+        width_mult=getattr(model_config, "width_mult", 1.0),
     )

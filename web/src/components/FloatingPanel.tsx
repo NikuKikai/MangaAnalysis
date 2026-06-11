@@ -1,18 +1,7 @@
+import { useShallow } from "zustand/react/shallow";
 import { IconButton } from "./IconButton";
-import type { DisplayState, MouseMode, SimulationSettings } from "../types/simulation";
-
-type FloatingPanelProps = {
-  mode: MouseMode;
-  display: DisplayState;
-  settings: SimulationSettings;
-  onModeChange: (mode: MouseMode) => void;
-  onSettingChange: <K extends keyof SimulationSettings>(key: K, value: SimulationSettings[K]) => void;
-  onToggleDisplay: (key: keyof DisplayState) => void;
-  onNextStep: () => void;
-  onReset: () => void;
-  onOpenImage: () => void;
-  nextDisabled: boolean;
-};
+import { useSimulationRuntime } from "../app/SimulationRuntime";
+import { useSimulationStore } from "../store/simulationStore";
 
 function CursorIcon() {
   return (
@@ -78,50 +67,53 @@ function ResetIcon() {
   );
 }
 
-export function FloatingPanel(props: FloatingPanelProps) {
-  const {
-    mode,
-    display,
-    settings,
-    onModeChange,
-    onSettingChange,
-    onToggleDisplay,
-    onNextStep,
-    onReset,
-    onOpenImage,
-    nextDisabled,
-  } = props;
+export function FloatingPanel() {
+  const { openImageDialog, handleNextStep } = useSimulationRuntime();
+  const { mode, display, settings, pendingNextFixation, setMode, updateSetting, toggleDisplay, clearSimulation } =
+    useSimulationStore(
+      useShallow((state) => ({
+        mode: state.mode,
+        display: state.display,
+        settings: state.settings,
+        pendingNextFixation: state.pendingNextFixation,
+        setMode: state.setMode,
+        updateSetting: state.updateSetting,
+        toggleDisplay: state.toggleDisplay,
+        clearSimulation: state.clearSimulation,
+      })),
+    );
+  const nextDisabled = !pendingNextFixation;
 
   return (
     <>
       <div className="panel panel-top-left">
-        <IconButton label="Open Image" onClick={onOpenImage}>
+        <IconButton label="Open Image" onClick={openImageDialog}>
           <FolderIcon />
         </IconButton>
       </div>
 
       <div className="panel panel-top-right">
         <div className="mode-group" role="group" aria-label="Mouse mode">
-          <IconButton active={mode === "click"} label="Click Mode" onClick={() => onModeChange("click")}>
+          <IconButton active={mode === "click"} label="Click Mode" onClick={() => setMode("click")}>
             <CursorIcon />
           </IconButton>
-          <IconButton active={mode === "box"} label="Box Mode" onClick={() => onModeChange("box")}>
+          <IconButton active={mode === "box"} label="Box Mode" onClick={() => setMode("box")}>
             <BoxIcon />
           </IconButton>
         </div>
-        <IconButton label="Next Step" disabled={nextDisabled} onClick={onNextStep}>
+        <IconButton label="Next Step" disabled={nextDisabled} onClick={() => void handleNextStep()}>
           <PlayIcon />
         </IconButton>
-        <IconButton active={display.showPreprocess} label="Preprocess" onClick={() => onToggleDisplay("showPreprocess")}>
+        <IconButton active={display.showPreprocess} label="Preprocess" onClick={() => toggleDisplay("showPreprocess")}>
           <EyeIcon />
         </IconButton>
-        <IconButton active={display.showHeatmap} label="Heatmap" onClick={() => onToggleDisplay("showHeatmap")}>
+        <IconButton active={display.showHeatmap} label="Heatmap" onClick={() => toggleDisplay("showHeatmap")}>
           <HeatIcon />
         </IconButton>
-        <IconButton active={display.showHistory} label="History" onClick={() => onToggleDisplay("showHistory")}>
+        <IconButton active={display.showHistory} label="History" onClick={() => toggleDisplay("showHistory")}>
           <PathIcon />
         </IconButton>
-        <IconButton label="Reset" onClick={onReset}>
+        <IconButton label="Reset" onClick={clearSimulation}>
           <ResetIcon />
         </IconButton>
       </div>
@@ -137,7 +129,7 @@ export function FloatingPanel(props: FloatingPanelProps) {
             max="32"
             step="0.25"
             value={settings.maxBlurStrength}
-            onChange={(event) => onSettingChange("maxBlurStrength", Number(event.target.value))}
+            onChange={(event) => updateSetting("maxBlurStrength", Number(event.target.value))}
           />
           <span className="slider-value">{settings.maxBlurStrength.toFixed(2)}</span>
         </label>
@@ -151,7 +143,7 @@ export function FloatingPanel(props: FloatingPanelProps) {
             max="0.2"
             step="0.005"
             value={settings.clearRadiusRatio}
-            onChange={(event) => onSettingChange("clearRadiusRatio", Number(event.target.value))}
+            onChange={(event) => updateSetting("clearRadiusRatio", Number(event.target.value))}
           />
           <span className="slider-value">{settings.clearRadiusRatio.toFixed(3)}</span>
         </label>
@@ -165,7 +157,7 @@ export function FloatingPanel(props: FloatingPanelProps) {
             max="0.45"
             step="0.005"
             value={settings.clickRoiHalfSizeRatio}
-            onChange={(event) => onSettingChange("clickRoiHalfSizeRatio", Number(event.target.value))}
+            onChange={(event) => updateSetting("clickRoiHalfSizeRatio", Number(event.target.value))}
           />
           <span className="slider-value">{settings.clickRoiHalfSizeRatio.toFixed(3)}</span>
         </label>

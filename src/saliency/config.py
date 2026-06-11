@@ -40,6 +40,7 @@ class ModelConfig:
     base_channels: int
     architecture_name: str = "v1"
     freeze_stages: int = 0
+    width_mult: float = 1.0
 
 
 @dataclass(slots=True)
