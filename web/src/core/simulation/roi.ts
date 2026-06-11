@@ -42,6 +42,18 @@ export function screenToPagePoint(
   };
 }
 
+export function pagePointToScreen(
+  point: Point,
+  imageRect: ImageRect,
+  imageWidth: number,
+  imageHeight: number,
+): Point {
+  return {
+    x: imageRect.x + (point.x / imageWidth) * imageRect.width,
+    y: imageRect.y + (point.y / imageHeight) * imageRect.height,
+  };
+}
+
 export function roiToScreenRect(roi: RoiRect, imageRect: ImageRect, imageWidth: number, imageHeight: number): ImageRect {
   return {
     x: imageRect.x + (roi.x / imageWidth) * imageRect.width,

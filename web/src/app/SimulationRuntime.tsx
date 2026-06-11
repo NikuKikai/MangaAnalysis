@@ -15,7 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { HeatmapRenderer } from "../core/gpu/heatmapRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { SaliencySession } from "../core/onnx/saliencySession";
-import { drawBaseImage, drawOverlay, drawPreprocessPreview, resizeAndClear2dCanvas } from "../core/render/draw";
+import { drawBaseImage, drawPreprocessPreview, resizeAndClear2dCanvas } from "../core/render/draw";
 import { extractCandidates, normalizeHeatmap } from "../core/simulation/candidates";
 import { addFixationToHistory, createHistoryMap } from "../core/simulation/history";
 import {
@@ -42,8 +42,15 @@ type SimulationRuntimeValue = {
   baseCanvasRef: RefObject<HTMLCanvasElement>;
   preprocessCanvasRef: RefObject<HTMLCanvasElement>;
   heatmapCanvasRef: RefObject<HTMLCanvasElement>;
-  overlayCanvasRef: RefObject<HTMLCanvasElement>;
   fileInputRef: RefObject<HTMLInputElement>;
+  overlay: {
+    viewportWidth: number;
+    viewportHeight: number;
+    imageRect: ImageRect | null;
+    imageWidth: number;
+    imageHeight: number;
+    dragRoi: RoiRect | null;
+  };
   handlePointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   handlePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
   handlePointerUp: (event: PointerEvent<HTMLDivElement>) => void;
@@ -93,7 +100,6 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
   const baseCanvasRef = useRef<HTMLCanvasElement>(null);
   const preprocessCanvasRef = useRef<HTMLCanvasElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const initStartedRef = useRef(false);
@@ -202,16 +208,14 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const baseCanvas = baseCanvasRef.current;
     const preprocessCanvas = preprocessCanvasRef.current;
-    const overlayCanvas = overlayCanvasRef.current;
     const heatmapCanvas = heatmapCanvasRef.current;
     const engine = engineRef.current;
-    if (!baseCanvas || !preprocessCanvas || !overlayCanvas || !heatmapCanvas) {
+    if (!baseCanvas || !preprocessCanvas || !heatmapCanvas) {
       return;
     }
 
     const baseContext = resizeAndClear2dCanvas(baseCanvas, viewport.width, viewport.height);
     const preprocessContext = resizeAndClear2dCanvas(preprocessCanvas, viewport.width, viewport.height);
-    const overlayContext = resizeAndClear2dCanvas(overlayCanvas, viewport.width, viewport.height);
     const ratio = window.devicePixelRatio || 1;
     heatmapCanvas.width = Math.max(1, Math.floor(viewport.width * ratio));
     heatmapCanvas.height = Math.max(1, Math.floor(viewport.height * ratio));
@@ -232,22 +236,6 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
       imageHeight: image?.height ?? 0,
       roi: currentRoi,
       enabled: display.showPreprocess,
-    });
-
-    drawOverlay({
-      context: overlayContext,
-      viewportWidth: viewport.width,
-      viewportHeight: viewport.height,
-      imageRect,
-      imageWidth: image?.width ?? 0,
-      imageHeight: image?.height ?? 0,
-      currentRoi,
-      dragRoi,
-      currentFixation,
-      pendingNextFixation,
-      trajectory,
-      candidates,
-      showHistory: display.showHistory,
     });
 
     if (engine) {
@@ -288,13 +276,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     image,
     imageRect,
     currentRoi,
-    dragRoi,
-    currentFixation,
-    pendingNextFixation,
-    trajectory,
-    candidates,
     currentPreprocess,
-    display.showHistory,
     display.showPreprocess,
     display.showHeatmap,
   ]);
@@ -476,8 +458,15 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
       baseCanvasRef,
       preprocessCanvasRef,
       heatmapCanvasRef,
-      overlayCanvasRef,
       fileInputRef,
+      overlay: {
+        viewportWidth: viewport.width,
+        viewportHeight: viewport.height,
+        imageRect,
+        imageWidth: image?.width ?? 0,
+        imageHeight: image?.height ?? 0,
+        dragRoi,
+      },
       handlePointerDown,
       handlePointerMove,
       handlePointerUp,

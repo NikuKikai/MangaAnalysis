@@ -1,17 +1,18 @@
 import { useSimulationRuntime } from "../app/SimulationRuntime";
+import { OverlaySvg } from "./OverlaySvg";
 
 export function SimulationStage() {
   const {
     baseCanvasRef,
     preprocessCanvasRef,
     heatmapCanvasRef,
-    overlayCanvasRef,
     fileInputRef,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
     handleDrop,
     handleFileChange,
+    overlay,
   } = useSimulationRuntime();
 
   return (
@@ -38,7 +39,7 @@ export function SimulationStage() {
         <canvas ref={baseCanvasRef} className="stage-canvas" />
         <canvas ref={preprocessCanvasRef} className="stage-canvas preprocess-layer" />
         <canvas ref={heatmapCanvasRef} className="stage-canvas heatmap-layer" />
-        <canvas ref={overlayCanvasRef} className="stage-canvas overlay-layer" />
+        <OverlaySvg {...overlay} />
       </div>
     </div>
   );
