@@ -1,16 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-  type PointerEvent,
-  type PropsWithChildren,
-  type RefObject,
-} from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { HeatmapRenderer } from "../core/gpu/heatmapRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
@@ -24,11 +12,10 @@ import {
   fitImageToViewport,
   roiCenter,
   roiToScreenRect,
-  screenToPagePoint,
   type ImageRect,
 } from "../core/simulation/roi";
 import { useSimulationStore } from "../store/simulationStore";
-import type { Point, PreprocessPreview, RoiRect, StepResult } from "../types/simulation";
+import type { ImageResource, Point, PreprocessPreview, RoiRect, StepResult } from "../types/simulation";
 import { useViewportSize } from "./useViewportSize";
 
 type Engine = {
@@ -38,12 +25,13 @@ type Engine = {
   session: SaliencySession;
 };
 
-type SimulationRuntimeValue = {
-  baseCanvasRef: RefObject<HTMLCanvasElement>;
-  historyCanvasRef: RefObject<HTMLCanvasElement>;
-  preprocessCanvasRef: RefObject<HTMLCanvasElement>;
-  heatmapCanvasRef: RefObject<HTMLCanvasElement>;
-  fileInputRef: RefObject<HTMLInputElement>;
+type SimulationEngineContextValue = {
+  refs: {
+    baseCanvasRef: RefObject<HTMLCanvasElement>;
+    historyCanvasRef: RefObject<HTMLCanvasElement>;
+    preprocessCanvasRef: RefObject<HTMLCanvasElement>;
+    heatmapCanvasRef: RefObject<HTMLCanvasElement>;
+  };
   overlay: {
     viewportWidth: number;
     viewportHeight: number;
@@ -52,16 +40,15 @@ type SimulationRuntimeValue = {
     imageHeight: number;
     dragRoi: RoiRect | null;
   };
-  handlePointerDown: (event: PointerEvent<HTMLDivElement>) => void;
-  handlePointerMove: (event: PointerEvent<HTMLDivElement>) => void;
-  handlePointerUp: (event: PointerEvent<HTMLDivElement>) => void;
-  handleDrop: (event: DragEvent<HTMLDivElement>) => void;
-  openImageDialog: () => void;
-  handleFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
-  handleNextStep: () => void;
+  interactionState: {
+    image: ImageResource | null;
+    imageRect: ImageRect | null;
+  };
+  loadImageFile: (file: File | null) => Promise<void>;
+  startClickStep: (point: Point) => Promise<void>;
+  startBoxStep: (roi: RoiRect) => Promise<void>;
+  handleNextStep: () => Promise<void>;
 };
-
-const SimulationRuntimeContext = createContext<SimulationRuntimeValue | null>(null);
 
 function buildPreprocessPreview(input: Float32Array): PreprocessPreview {
   const size = modelSize();
@@ -97,12 +84,13 @@ async function createEngine(heatmapCanvas: HTMLCanvasElement): Promise<Engine> {
   return { device, preprocessor, heatmapRenderer, session };
 }
 
-export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
+const SimulationEngineContext = createContext<SimulationEngineContextValue | null>(null);
+
+export function SimulationProvider({ children }: PropsWithChildren) {
   const baseCanvasRef = useRef<HTMLCanvasElement>(null);
   const historyCanvasRef = useRef<HTMLCanvasElement>(null);
   const preprocessCanvasRef = useRef<HTMLCanvasElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const initStartedRef = useRef(false);
   const [imageRect, setImageRect] = useState<ImageRect | null>(null);
@@ -110,53 +98,47 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
   const viewport = useViewportSize();
   const {
     image,
-    mode,
     display,
     settings,
     historyMap,
     historyMapWidth,
     historyMapHeight,
-    currentFixation,
     currentRoi,
     activeRoiHalfSizePx,
     pendingNextFixation,
-    candidates,
     trajectory,
     currentPreprocess,
     dragStart,
     dragCurrent,
     isDragging,
+    mode,
     setLoadingState,
     setError,
     setWebgpuAvailable,
     setImage,
-    setDragState,
     applyStepOutcome,
     clearSimulation,
   } = useSimulationStore(
     useShallow((state) => ({
       image: state.image,
-      mode: state.mode,
       display: state.display,
       settings: state.settings,
       historyMap: state.historyMap,
       historyMapWidth: state.historyMapWidth,
       historyMapHeight: state.historyMapHeight,
-      currentFixation: state.currentFixation,
       currentRoi: state.currentRoi,
       activeRoiHalfSizePx: state.activeRoiHalfSizePx,
       pendingNextFixation: state.pendingNextFixation,
-      candidates: state.candidates,
       trajectory: state.trajectory,
       currentPreprocess: state.currentPreprocess,
       dragStart: state.dragStart,
       dragCurrent: state.dragCurrent,
       isDragging: state.isDragging,
+      mode: state.mode,
       setLoadingState: state.setLoadingState,
       setError: state.setError,
       setWebgpuAvailable: state.setWebgpuAvailable,
       setImage: state.setImage,
-      setDragState: state.setDragState,
       applyStepOutcome: state.applyStepOutcome,
       clearSimulation: state.clearSimulation,
     })),
@@ -312,11 +294,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     clearSimulation();
   };
 
-  const runStep = async (
-    roi: RoiRect,
-    fixation: Point,
-    committedTrajectory: Point[],
-  ) => {
+  const runStep = async (roi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
     const engine = engineRef.current;
     if (!engine || !image) {
       return;
@@ -379,65 +357,12 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     }
     const halfSize = image.height * settings.clickRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(point, halfSize);
-    const trajectorySeed = [point];
-    await runStep(roi, point, trajectorySeed);
+    await runStep(roi, point, [point]);
   };
 
   const startBoxStep = async (roi: RoiRect) => {
     const fixation = roiCenter(roi);
-    if (!image) {
-      return;
-    }
-    const trajectorySeed = [fixation];
-    await runStep(roi, fixation, trajectorySeed);
-  };
-
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (!imageRect || !image) {
-      return;
-    }
-    const point = screenToPagePoint(event.clientX, event.clientY, imageRect, image.width, image.height);
-    if (!point) {
-      return;
-    }
-    if (mode === "box") {
-      setDragState(point, point, true);
-    }
-  };
-
-  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !dragStart || !imageRect || !image || mode !== "box") {
-      return;
-    }
-    const point = screenToPagePoint(event.clientX, event.clientY, imageRect, image.width, image.height);
-    if (!point) {
-      return;
-    }
-    setDragState(dragStart, point, true);
-  };
-
-  const handlePointerUp = async (event: PointerEvent<HTMLDivElement>) => {
-    if (!imageRect || !image) {
-      return;
-    }
-    const point = screenToPagePoint(event.clientX, event.clientY, imageRect, image.width, image.height);
-    if (!point) {
-      setDragState(null, null, false);
-      return;
-    }
-
-    if (mode === "click") {
-      await startClickStep(point);
-      return;
-    }
-
-    if (mode === "box" && dragStart) {
-      const roi = createSquareFromDrag(dragStart, point);
-      setDragState(null, null, false);
-      if (roi.size >= 2) {
-        await startBoxStep(roi);
-      }
-    }
+    await runStep(roi, fixation, [fixation]);
   };
 
   const handleNextStep = async () => {
@@ -446,54 +371,41 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     }
     const halfSize = activeRoiHalfSizePx ?? image.height * settings.clickRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(pendingNextFixation, halfSize);
-    const nextTrajectory = [...trajectory, pendingNextFixation];
-    await runStep(roi, pendingNextFixation, nextTrajectory);
+    await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation]);
   };
 
-  const openImageDialog = () => fileInputRef.current?.click();
-
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    void loadImageFile(event.target.files?.[0] ?? null);
-  };
-
-  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    void loadImageFile(event.dataTransfer.files?.[0] ?? null);
-  };
-
-  const value = useMemo<SimulationRuntimeValue>(
-    () => ({
+  const value: SimulationEngineContextValue = {
+    refs: {
       baseCanvasRef,
       historyCanvasRef,
       preprocessCanvasRef,
       heatmapCanvasRef,
-      fileInputRef,
-      overlay: {
-        viewportWidth: viewport.width,
-        viewportHeight: viewport.height,
-        imageRect,
-        imageWidth: image?.width ?? 0,
-        imageHeight: image?.height ?? 0,
-        dragRoi,
-      },
-      handlePointerDown,
-      handlePointerMove,
-      handlePointerUp,
-      handleDrop,
-      openImageDialog,
-      handleFileChange,
-      handleNextStep,
-    }),
-    [dragRoi, handleDrop, handleFileChange, handleNextStep, handlePointerDown, handlePointerMove, handlePointerUp, image, imageRect, viewport.height, viewport.width],
-  );
+    },
+    overlay: {
+      viewportWidth: viewport.width,
+      viewportHeight: viewport.height,
+      imageRect,
+      imageWidth: image?.width ?? 0,
+      imageHeight: image?.height ?? 0,
+      dragRoi,
+    },
+    interactionState: {
+      image,
+      imageRect,
+    },
+    loadImageFile,
+    startClickStep,
+    startBoxStep,
+    handleNextStep,
+  };
 
-  return <SimulationRuntimeContext.Provider value={value}>{children}</SimulationRuntimeContext.Provider>;
+  return <SimulationEngineContext.Provider value={value}>{children}</SimulationEngineContext.Provider>;
 }
 
-export function useSimulationRuntime() {
-  const value = useContext(SimulationRuntimeContext);
+export function useSimulationEngineContext() {
+  const value = useContext(SimulationEngineContext);
   if (!value) {
-    throw new Error("useSimulationRuntime must be used inside SimulationRuntimeProvider.");
+    throw new Error("useSimulationEngineContext must be used inside SimulationProvider.");
   }
   return value;
 }

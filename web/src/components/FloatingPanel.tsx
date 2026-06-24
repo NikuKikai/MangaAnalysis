@@ -1,6 +1,7 @@
+import { useRef, type ChangeEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useSimulationEngineContext } from "../app/SimulationRuntime";
 import { IconButton } from "./IconButton";
-import { useSimulationRuntime } from "../app/SimulationRuntime";
 import { useSimulationStore } from "../store/simulationStore";
 
 function CursorIcon() {
@@ -68,7 +69,8 @@ function ResetIcon() {
 }
 
 export function FloatingPanel() {
-  const { openImageDialog, handleNextStep } = useSimulationRuntime();
+  const { loadImageFile, handleNextStep } = useSimulationEngineContext();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { mode, display, settings, pendingNextFixation, setMode, updateSetting, toggleDisplay, clearSimulation } =
     useSimulationStore(
       useShallow((state) => ({
@@ -83,9 +85,21 @@ export function FloatingPanel() {
       })),
     );
   const nextDisabled = !pendingNextFixation;
+  const openImageDialog = () => fileInputRef.current?.click();
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    void loadImageFile(event.target.files?.[0] ?? null);
+    event.target.value = "";
+  };
 
   return (
     <>
+      <input
+        ref={fileInputRef}
+        className="visually-hidden"
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
       <div className="panel panel-top-left">
         <IconButton label="Open Image" onClick={openImageDialog}>
           <FolderIcon />
