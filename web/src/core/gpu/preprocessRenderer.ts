@@ -1,4 +1,4 @@
-import type { ImageRect } from "../simulation/roi";
+import type { ImageRect } from "../utils/roi";
 
 const PREPROCESS_SHADER = /* wgsl */ `
 struct Uniforms {

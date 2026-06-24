@@ -5,7 +5,7 @@ import { HistoryRenderer } from "../core/gpu/historyRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { PreprocessRenderer } from "../core/gpu/preprocessRenderer";
 import { SaliencySession } from "../core/onnx/saliencySession";
-import { drawBaseImage, resizeAndClear2dCanvas } from "../core/render/draw";
+import { drawBaseImage, resizeAndClear2dCanvas } from "../core/utils/canvas2d";
 import {
   createCenteredSquareRoi,
   createSquareFromDrag,
@@ -14,7 +14,7 @@ import {
   roiCenter,
   roiToPhysicalScreenRect,
   type ImageRect,
-} from "../core/simulation/roi";
+} from "../core/utils/roi";
 import { useSimulationStore } from "../store/simulationStore";
 import type { ImageResource, Point, RoiRect } from "../types/simulation";
 import { useViewportSize } from "./useViewportSize";

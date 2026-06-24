@@ -1,4 +1,4 @@
-import type { ImageRect } from "../simulation/roi";
+import type { ImageRect } from "./roi";
 
 function setupCanvas(canvas: HTMLCanvasElement, width: number, height: number): CanvasRenderingContext2D {
   const ratio = window.devicePixelRatio || 1;

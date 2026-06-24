@@ -1,4 +1,4 @@
-import type { ImageRect } from "../simulation/roi";
+import type { ImageRect } from "../utils/roi";
 
 const HEATMAP_SHADER = /* wgsl */ `
 struct Uniforms {

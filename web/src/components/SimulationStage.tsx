@@ -1,6 +1,6 @@
 import type { DragEvent, PointerEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { createSquareFromDrag, screenToPagePoint } from "../core/simulation/roi";
+import { createSquareFromDrag, screenToPagePoint } from "../core/utils/roi";
 import { useSimulationEngineContext } from "../app/SimulationRuntime";
 import { useSimulationStore } from "../store/simulationStore";
 import { OverlaySvg } from "./OverlaySvg";

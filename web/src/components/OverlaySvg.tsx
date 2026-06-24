@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useSimulationStore } from "../store/simulationStore";
-import { pagePointToScreen, roiToScreenRect, type ImageRect } from "../core/simulation/roi";
+import { pagePointToScreen, roiToScreenRect, type ImageRect } from "../core/utils/roi";
 
 type OverlaySvgProps = {
   viewportWidth: number;
