@@ -29,7 +29,6 @@ type Engine = {
   session: SaliencySession;
   historyMapWidth: number;
   historyMapHeight: number;
-  currentPreprocess: Float32Array | null;
 };
 
 type SimulationEngineContextValue = {
@@ -85,7 +84,6 @@ async function createEngine(
     session,
     historyMapWidth: 0,
     historyMapHeight: 0,
-    currentPreprocess: null,
   };
 }
 
@@ -168,7 +166,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       engineRef.current.preprocessor.setSourceImage(image.bitmap);
       engineRef.current.historyMapWidth = image.width;
       engineRef.current.historyMapHeight = image.height;
-      engineRef.current.currentPreprocess = null;
       engineRef.current.historyRenderer.initialize(image.width, image.height);
     }
   }, [image]);
@@ -188,7 +185,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     }
     engine.historyMapWidth = image.width;
     engine.historyMapHeight = image.height;
-    engine.currentPreprocess = null;
     engine.historyRenderer.initialize(image.width, image.height);
   }, [image, trajectory.length, currentRoi, currentFixation, pendingNextFixation]);
 
@@ -249,7 +245,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       image?.height ?? 0,
       physicalRatio,
     );
-    engine.preprocessRenderer.updatePreview(engine.currentPreprocess, modelSize());
     engine.preprocessRenderer.render({
       imageRect:
         scaledImageRect ??
@@ -328,7 +323,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     );
 
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
-    engine.currentPreprocess = input;
+    engine.preprocessRenderer.updatePreview(input, modelSize());
     const heatmap = await engine.session.predict(input);
     const nmsRadius = Math.max(1, Math.round((image.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
     const distanceSigma = Math.max(1, image.height * settings.distanceSigmaRatio);
