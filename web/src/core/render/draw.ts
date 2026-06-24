@@ -1,3 +1,4 @@
+import type { RoiRect } from "../../types/simulation";
 import { roiToScreenRect, type ImageRect } from "../simulation/roi";
 
 function setupCanvas(canvas: HTMLCanvasElement, width: number, height: number): CanvasRenderingContext2D {
