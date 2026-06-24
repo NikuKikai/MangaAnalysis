@@ -194,6 +194,20 @@ export function FloatingPanel() {
           />
           <span className="slider-value">{settings.historyAlpha.toFixed(1)}</span>
         </label>
+        <label className="slider-row" title="History Decay">
+          <span className="slider-label">
+            Decay
+          </span>
+          <input
+            type="range"
+            min="0.7"
+            max="0.995"
+            step="0.005"
+            value={settings.historyDecay}
+            onChange={(event) => updateSetting("historyDecay", Number(event.target.value))}
+          />
+          <span className="slider-value">{settings.historyDecay.toFixed(3)}</span>
+        </label>
       </div>
     </>
   );

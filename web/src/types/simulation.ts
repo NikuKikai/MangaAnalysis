@@ -22,6 +22,7 @@ export type SimulationSettings = {
   clearRadiusRatio: number;
   clickRoiHalfSizeRatio: number;
   historySigmaRatio: number;
+  historyDecay: number;
   historyAlpha: number;
   distanceSigmaRatio: number;
   thresholdRatio: number;

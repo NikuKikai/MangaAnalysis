@@ -6,7 +6,6 @@ import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { PreprocessRenderer } from "../core/gpu/preprocessRenderer";
 import { SaliencySession } from "../core/onnx/saliencySession";
 import { drawBaseImage, resizeAndClear2dCanvas } from "../core/render/draw";
-import { addFixationToHistory, createHistoryMap } from "../core/simulation/history";
 import {
   createCenteredSquareRoi,
   createSquareFromDrag,
@@ -28,6 +27,9 @@ type Engine = {
   preprocessRenderer: PreprocessRenderer;
   candidateSelector: GpuCandidateSelector;
   session: SaliencySession;
+  historyMapWidth: number;
+  historyMapHeight: number;
+  currentPreprocess: Float32Array | null;
 };
 
 type SimulationEngineContextValue = {
@@ -73,7 +75,18 @@ async function createEngine(
   const preprocessRenderer = new PreprocessRenderer(device, preprocessCanvas);
   const candidateSelector = new GpuCandidateSelector(device);
   const session = await SaliencySession.create();
-  return { device, preprocessor, heatmapRenderer, historyRenderer, preprocessRenderer, candidateSelector, session };
+  return {
+    device,
+    preprocessor,
+    heatmapRenderer,
+    historyRenderer,
+    preprocessRenderer,
+    candidateSelector,
+    session,
+    historyMapWidth: 0,
+    historyMapHeight: 0,
+    currentPreprocess: null,
+  };
 }
 
 const SimulationEngineContext = createContext<SimulationEngineContextValue | null>(null);
@@ -93,14 +106,11 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const image = useSimulationStore((state) => state.image);
   const display = useSimulationStore((state) => state.display);
   const settings = useSimulationStore((state) => state.settings);
-  const historyMap = useSimulationStore((state) => state.historyMap);
-  const historyMapWidth = useSimulationStore((state) => state.historyMapWidth);
-  const historyMapHeight = useSimulationStore((state) => state.historyMapHeight);
   const currentRoi = useSimulationStore((state) => state.currentRoi);
+  const currentFixation = useSimulationStore((state) => state.currentFixation);
   const activeRoiHalfSizePx = useSimulationStore((state) => state.activeRoiHalfSizePx);
   const pendingNextFixation = useSimulationStore((state) => state.pendingNextFixation);
   const trajectory = useSimulationStore((state) => state.trajectory);
-  const currentPreprocess = useSimulationStore((state) => state.currentPreprocess);
   const dragStart = useSimulationStore((state) => state.dragStart);
   const dragCurrent = useSimulationStore((state) => state.dragCurrent);
   const isDragging = useSimulationStore((state) => state.isDragging);
@@ -156,8 +166,31 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (image && engineRef.current) {
       engineRef.current.preprocessor.setSourceImage(image.bitmap);
+      engineRef.current.historyMapWidth = image.width;
+      engineRef.current.historyMapHeight = image.height;
+      engineRef.current.currentPreprocess = null;
+      engineRef.current.historyRenderer.initialize(image.width, image.height);
     }
   }, [image]);
+
+  // Reset GPU-side simulation buffers when the logical simulation state is cleared.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (
+      !engine ||
+      !image ||
+      trajectory.length !== 0 ||
+      currentRoi ||
+      currentFixation ||
+      pendingNextFixation
+    ) {
+      return;
+    }
+    engine.historyMapWidth = image.width;
+    engine.historyMapHeight = image.height;
+    engine.currentPreprocess = null;
+    engine.historyRenderer.initialize(image.width, image.height);
+  }, [image, trajectory.length, currentRoi, currentFixation, pendingNextFixation]);
 
   // Keep the GPU overlay canvases sized to the current viewport in physical pixels.
   useEffect(() => {
@@ -216,7 +249,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       image?.height ?? 0,
       physicalRatio,
     );
-    engine.preprocessRenderer.updatePreview(currentPreprocess, modelSize());
+    engine.preprocessRenderer.updatePreview(engine.currentPreprocess, modelSize());
     engine.preprocessRenderer.render({
       imageRect:
         scaledImageRect ??
@@ -229,7 +262,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       roiRect: scaledRoiRect,
       enabled: display.showPreprocess,
     });
-  }, [currentPreprocess, imageRect, image, currentRoi, display.showPreprocess]);
+  }, [imageRect, image, currentRoi, display.showPreprocess]);
 
   // Upload and render the history overlay whenever its data or visibility changes.
   useEffect(() => {
@@ -240,18 +273,11 @@ export function SimulationProvider({ children }: PropsWithChildren) {
 
     const physicalRatio = window.devicePixelRatio || 1;
     const scaledImageRect = imageRectToPhysical(imageRect, physicalRatio);
-    engine.historyRenderer.updateHistory(historyMap, historyMapWidth, historyMapHeight);
     engine.historyRenderer.render({
       imageRect: scaledImageRect,
       enabled: Boolean(display.showHistoryHeatmap && imageRect),
     });
-  }, [
-    imageRect,
-    historyMap,
-    historyMapWidth,
-    historyMapHeight,
-    display.showHistoryHeatmap,
-  ]);
+  }, [imageRect, display.showHistoryHeatmap]);
 
   // Render the heatmap overlay from the latest GPU buffer and current ROI placement.
   useEffect(() => {
@@ -289,11 +315,20 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!engine || !image) {
       return;
     }
-
-    const nextHistoryMap = historyMap ? historyMap.slice() : createHistoryMap(image.width, image.height);
-    addFixationToHistory(nextHistoryMap, image.width, image.height, fixation, image.height * settings.historySigmaRatio);
+    if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
+      engine.historyMapWidth = image.width;
+      engine.historyMapHeight = image.height;
+      engine.historyRenderer.initialize(image.width, image.height);
+    }
+    engine.historyRenderer.accumulateFixation(
+      fixation.x,
+      fixation.y,
+      image.height * settings.historySigmaRatio,
+      settings.historyDecay,
+    );
 
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
+    engine.currentPreprocess = input;
     const heatmap = await engine.session.predict(input);
     let maxHeatmapValue = 0;
     for (let index = 0; index < heatmap.length; index += 1) {
@@ -304,7 +339,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     const nmsRadius = Math.max(1, Math.round((image.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
     const distanceSigma = Math.max(1, image.height * settings.distanceSigmaRatio);
     engine.heatmapRenderer.updateHeatmap(heatmap, modelSize());
-    engine.historyRenderer.updateHistory(nextHistoryMap, image.width, image.height);
     const scoredCandidates = await engine.candidateSelector.select({
       heatmapBuffer: engine.heatmapRenderer.getBuffer(),
       historyBuffer: engine.historyRenderer.getBuffer(),
@@ -317,8 +351,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       imageWidth: image.width,
       imageHeight: image.height,
       currentFixation: fixation,
-      historyMapWidth: image.width,
-      historyMapHeight: image.height,
+      historyMapWidth: engine.historyMapWidth,
+      historyMapHeight: engine.historyMapHeight,
       historyAlpha: settings.historyAlpha,
       distanceSigma,
     });
@@ -337,9 +371,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       candidates: scoredCandidates,
       pendingNextFixation,
       committedTrajectory,
-      historyMap: nextHistoryMap,
-      historyMapWidth: image.width,
-      historyMapHeight: image.height,
     });
   };
 
