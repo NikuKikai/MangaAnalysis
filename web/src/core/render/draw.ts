@@ -60,3 +60,64 @@ export function drawPreprocessPreview(params: {
   context.imageSmoothingEnabled = true;
   context.drawImage(scratchCanvas, roiRect.x, roiRect.y, roiRect.width, roiRect.height);
 }
+
+function colorizeHistoryValue(value: number): [number, number, number, number] {
+  const v = Math.max(0, Math.min(1, value));
+  const low = Math.min(1, v * 1.6);
+  const high = Math.max(0, Math.min(1, (v - 0.28) / 0.72));
+  return [
+    Math.round(255 * (0.25 + high * 0.75)),
+    Math.round(255 * (0.2 + low * 0.55)),
+    Math.round(255 * (0.1 + (1 - high) * 0.18)),
+    Math.round(210 * v),
+  ];
+}
+
+export function drawHistoryHeatmap(params: {
+  context: CanvasRenderingContext2D;
+  historyMap: Float32Array | null;
+  historyMapWidth: number;
+  historyMapHeight: number;
+  imageRect: ImageRect | null;
+  enabled: boolean;
+}): void {
+  const { context, historyMap, historyMapWidth, historyMapHeight, imageRect, enabled } = params;
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+  if (!enabled || !historyMap || !imageRect || historyMapWidth <= 0 || historyMapHeight <= 0) {
+    return;
+  }
+
+  let maxValue = 0;
+  for (let index = 0; index < historyMap.length; index += 1) {
+    if (historyMap[index] > maxValue) {
+      maxValue = historyMap[index];
+    }
+  }
+  if (maxValue <= 0) {
+    return;
+  }
+
+  const rgba = new Uint8ClampedArray(historyMapWidth * historyMapHeight * 4);
+  for (let index = 0; index < historyMap.length; index += 1) {
+    const normalized = Math.min(1, historyMap[index] / maxValue);
+    const [r, g, b, a] = colorizeHistoryValue(normalized);
+    const base = index * 4;
+    rgba[base] = r;
+    rgba[base + 1] = g;
+    rgba[base + 2] = b;
+    rgba[base + 3] = a;
+  }
+
+  const imageData = new ImageData(rgba, historyMapWidth, historyMapHeight);
+  const scratchCanvas = document.createElement("canvas");
+  scratchCanvas.width = historyMapWidth;
+  scratchCanvas.height = historyMapHeight;
+  const scratchContext = scratchCanvas.getContext("2d");
+  if (!scratchContext) {
+    throw new Error("2D canvas context is unavailable.");
+  }
+  scratchContext.putImageData(imageData, 0, 0);
+
+  context.imageSmoothingEnabled = true;
+  context.drawImage(scratchCanvas, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
+}

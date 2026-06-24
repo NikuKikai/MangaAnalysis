@@ -110,7 +110,11 @@ export function FloatingPanel() {
         <IconButton active={display.showHeatmap} label="Heatmap" onClick={() => toggleDisplay("showHeatmap")}>
           <HeatIcon />
         </IconButton>
-        <IconButton active={display.showHistory} label="History" onClick={() => toggleDisplay("showHistory")}>
+        <IconButton
+          active={display.showHistoryHeatmap}
+          label="History"
+          onClick={() => toggleDisplay("showHistoryHeatmap")}
+        >
           <PathIcon />
         </IconButton>
         <IconButton label="Reset" onClick={clearSimulation}>
@@ -160,6 +164,20 @@ export function FloatingPanel() {
             onChange={(event) => updateSetting("clickRoiHalfSizeRatio", Number(event.target.value))}
           />
           <span className="slider-value">{settings.clickRoiHalfSizeRatio.toFixed(3)}</span>
+        </label>
+        <label className="slider-row" title="History Inhibition Strength">
+          <span className="slider-label">
+            Hist
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="8"
+            step="0.1"
+            value={settings.historyAlpha}
+            onChange={(event) => updateSetting("historyAlpha", Number(event.target.value))}
+          />
+          <span className="slider-value">{settings.historyAlpha.toFixed(1)}</span>
         </label>
       </div>
     </>

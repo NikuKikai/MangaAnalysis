@@ -14,7 +14,7 @@ export type MouseMode = "click" | "box";
 export type DisplayState = {
   showPreprocess: boolean;
   showHeatmap: boolean;
-  showHistory: boolean;
+  showHistoryHeatmap: boolean;
 };
 
 export type SimulationSettings = {

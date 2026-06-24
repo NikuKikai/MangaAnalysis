@@ -27,7 +27,7 @@ const defaultSettings: SimulationSettings = {
 const defaultDisplay: DisplayState = {
   showPreprocess: true,
   showHeatmap: true,
-  showHistory: true,
+  showHistoryHeatmap: false,
 };
 
 type SimulationStore = {

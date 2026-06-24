@@ -4,6 +4,7 @@ import { OverlaySvg } from "./OverlaySvg";
 export function SimulationStage() {
   const {
     baseCanvasRef,
+    historyCanvasRef,
     preprocessCanvasRef,
     heatmapCanvasRef,
     fileInputRef,
@@ -39,6 +40,7 @@ export function SimulationStage() {
         <canvas ref={baseCanvasRef} className="stage-canvas" />
         <canvas ref={preprocessCanvasRef} className="stage-canvas preprocess-layer" />
         <canvas ref={heatmapCanvasRef} className="stage-canvas heatmap-layer" />
+        <canvas ref={historyCanvasRef} className="stage-canvas history-layer" />
         <OverlaySvg {...overlay} />
       </div>
     </div>

@@ -15,7 +15,7 @@ import { useShallow } from "zustand/react/shallow";
 import { HeatmapRenderer } from "../core/gpu/heatmapRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { SaliencySession } from "../core/onnx/saliencySession";
-import { drawBaseImage, drawPreprocessPreview, resizeAndClear2dCanvas } from "../core/render/draw";
+import { drawBaseImage, drawHistoryHeatmap, drawPreprocessPreview, resizeAndClear2dCanvas } from "../core/render/draw";
 import { extractCandidates, normalizeHeatmap } from "../core/simulation/candidates";
 import { addFixationToHistory, createHistoryMap } from "../core/simulation/history";
 import {
@@ -40,6 +40,7 @@ type Engine = {
 
 type SimulationRuntimeValue = {
   baseCanvasRef: RefObject<HTMLCanvasElement>;
+  historyCanvasRef: RefObject<HTMLCanvasElement>;
   preprocessCanvasRef: RefObject<HTMLCanvasElement>;
   heatmapCanvasRef: RefObject<HTMLCanvasElement>;
   fileInputRef: RefObject<HTMLInputElement>;
@@ -98,6 +99,7 @@ async function createEngine(heatmapCanvas: HTMLCanvasElement): Promise<Engine> {
 
 export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
   const baseCanvasRef = useRef<HTMLCanvasElement>(null);
+  const historyCanvasRef = useRef<HTMLCanvasElement>(null);
   const preprocessCanvasRef = useRef<HTMLCanvasElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -207,14 +209,16 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const baseCanvas = baseCanvasRef.current;
+    const historyCanvas = historyCanvasRef.current;
     const preprocessCanvas = preprocessCanvasRef.current;
     const heatmapCanvas = heatmapCanvasRef.current;
     const engine = engineRef.current;
-    if (!baseCanvas || !preprocessCanvas || !heatmapCanvas) {
+    if (!baseCanvas || !historyCanvas || !preprocessCanvas || !heatmapCanvas) {
       return;
     }
 
     const baseContext = resizeAndClear2dCanvas(baseCanvas, viewport.width, viewport.height);
+    const historyContext = resizeAndClear2dCanvas(historyCanvas, viewport.width, viewport.height);
     const preprocessContext = resizeAndClear2dCanvas(preprocessCanvas, viewport.width, viewport.height);
     const ratio = window.devicePixelRatio || 1;
     heatmapCanvas.width = Math.max(1, Math.floor(viewport.width * ratio));
@@ -226,6 +230,15 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     if (image && imageRect) {
       drawBaseImage(baseContext, image.bitmap, imageRect);
     }
+
+    drawHistoryHeatmap({
+      context: historyContext,
+      historyMap,
+      historyMapWidth,
+      historyMapHeight,
+      imageRect,
+      enabled: display.showHistoryHeatmap,
+    });
 
     drawPreprocessPreview({
       context: preprocessContext,
@@ -277,8 +290,12 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     imageRect,
     currentRoi,
     currentPreprocess,
+    historyMap,
+    historyMapWidth,
+    historyMapHeight,
     display.showPreprocess,
     display.showHeatmap,
+    display.showHistoryHeatmap,
   ]);
 
   const loadImageFile = async (file: File | null) => {
@@ -456,6 +473,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
   const value = useMemo<SimulationRuntimeValue>(
     () => ({
       baseCanvasRef,
+      historyCanvasRef,
       preprocessCanvasRef,
       heatmapCanvasRef,
       fileInputRef,
@@ -475,7 +493,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
       handleFileChange,
       handleNextStep,
     }),
-    [handleDrop, handleFileChange, handleNextStep, handlePointerDown, handlePointerMove, handlePointerUp],
+    [dragRoi, handleDrop, handleFileChange, handleNextStep, handlePointerDown, handlePointerMove, handlePointerUp, image, imageRect, viewport.height, viewport.width],
   );
 
   return <SimulationRuntimeContext.Provider value={value}>{children}</SimulationRuntimeContext.Provider>;

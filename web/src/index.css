@@ -69,6 +69,7 @@ svg {
 }
 
 .preprocess-layer,
+.history-layer,
 .heatmap-layer,
 .overlay-layer {
   pointer-events: none;

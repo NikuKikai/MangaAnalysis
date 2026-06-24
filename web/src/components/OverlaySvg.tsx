@@ -14,9 +14,8 @@ type OverlaySvgProps = {
 
 export function OverlaySvg(props: OverlaySvgProps) {
   const { viewportWidth, viewportHeight, imageRect, imageWidth, imageHeight, dragRoi } = props;
-  const { display, currentRoi, currentFixation, pendingNextFixation, trajectory, candidates } = useSimulationStore(
+  const { currentRoi, currentFixation, pendingNextFixation, trajectory, candidates } = useSimulationStore(
     useShallow((state) => ({
-      display: state.display,
       currentRoi: state.currentRoi,
       currentFixation: state.currentFixation,
       pendingNextFixation: state.pendingNextFixation,
@@ -86,21 +85,19 @@ export function OverlaySvg(props: OverlaySvgProps) {
       height={viewportHeight}
       aria-hidden="true"
     >
-      {display.showHistory && trajectoryPath ? (
+      {trajectoryPath ? (
         <>
           <path className="overlay-history-shadow" d={trajectoryPath} />
           <path className="overlay-history-line" d={trajectoryPath} />
         </>
       ) : null}
 
-      {display.showHistory
-        ? trajectoryPoints.map((point, index) => (
-            <g key={`fixation-history-${index}`}>
-              <circle className="overlay-history-dot-shadow" cx={point.x} cy={point.y} r={7} />
-              <circle className="overlay-history-dot" cx={point.x} cy={point.y} r={5} />
-            </g>
-          ))
-        : null}
+      {trajectoryPoints.map((point, index) => (
+        <g key={`fixation-history-${index}`}>
+          <circle className="overlay-history-dot-shadow" cx={point.x} cy={point.y} r={7} />
+          <circle className="overlay-history-dot" cx={point.x} cy={point.y} r={5} />
+        </g>
+      ))}
 
       {candidateDots.map((candidate) => (
         <g key={candidate.id}>
