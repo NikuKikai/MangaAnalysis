@@ -131,8 +131,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     setWebgpuAvailable,
     setImage,
     setDragState,
-    applyStepResult,
-    updateHistoryMap,
+    applyStepOutcome,
     clearSimulation,
   } = useSimulationStore(
     useShallow((state) => ({
@@ -158,8 +157,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
       setWebgpuAvailable: state.setWebgpuAvailable,
       setImage: state.setImage,
       setDragState: state.setDragState,
-      applyStepResult: state.applyStepResult,
-      updateHistoryMap: state.updateHistoryMap,
+      applyStepOutcome: state.applyStepOutcome,
       clearSimulation: state.clearSimulation,
     })),
   );
@@ -318,12 +316,14 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     roi: RoiRect,
     fixation: Point,
     committedTrajectory: Point[],
-    activeHistoryMap: Float32Array,
   ) => {
     const engine = engineRef.current;
     if (!engine || !image) {
       return;
     }
+
+    const nextHistoryMap = historyMap ? historyMap.slice() : createHistoryMap(image.width, image.height);
+    addFixationToHistory(nextHistoryMap, image.width, image.height, fixation, image.height * settings.historySigmaRatio);
 
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
     const preprocess = buildPreprocessPreview(input);
@@ -342,9 +342,9 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
       imageWidth: image.width,
       imageHeight: image.height,
       currentFixation: fixation,
-      historyMap: activeHistoryMap,
-      historyMapWidth,
-      historyMapHeight,
+      historyMap: nextHistoryMap,
+      historyMapWidth: image.width,
+      historyMapHeight: image.height,
       historyAlpha: settings.historyAlpha,
       distanceSigma,
     });
@@ -364,7 +364,13 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
             }
           : null,
     };
-    applyStepResult(stepResult, committedTrajectory);
+    applyStepOutcome({
+      result: stepResult,
+      committedTrajectory,
+      historyMap: nextHistoryMap,
+      historyMapWidth: image.width,
+      historyMapHeight: image.height,
+    });
   };
 
   const startClickStep = async (point: Point) => {
@@ -374,10 +380,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     const halfSize = image.height * settings.clickRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(point, halfSize);
     const trajectorySeed = [point];
-    const nextHistory = historyMap ? historyMap.slice() : createHistoryMap(image.width, image.height);
-    addFixationToHistory(nextHistory, image.width, image.height, point, image.height * settings.historySigmaRatio);
-    updateHistoryMap(nextHistory, image.width, image.height);
-    await runStep(roi, point, trajectorySeed, nextHistory);
+    await runStep(roi, point, trajectorySeed);
   };
 
   const startBoxStep = async (roi: RoiRect) => {
@@ -386,10 +389,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
       return;
     }
     const trajectorySeed = [fixation];
-    const nextHistory = historyMap ? historyMap.slice() : createHistoryMap(image.width, image.height);
-    addFixationToHistory(nextHistory, image.width, image.height, fixation, image.height * settings.historySigmaRatio);
-    updateHistoryMap(nextHistory, image.width, image.height);
-    await runStep(roi, fixation, trajectorySeed, nextHistory);
+    await runStep(roi, fixation, trajectorySeed);
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -447,16 +447,7 @@ export function SimulationRuntimeProvider({ children }: PropsWithChildren) {
     const halfSize = activeRoiHalfSizePx ?? image.height * settings.clickRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(pendingNextFixation, halfSize);
     const nextTrajectory = [...trajectory, pendingNextFixation];
-    const nextHistory = historyMap ? historyMap.slice() : createHistoryMap(image.width, image.height);
-    addFixationToHistory(
-      nextHistory,
-      image.width,
-      image.height,
-      pendingNextFixation,
-      image.height * settings.historySigmaRatio,
-    );
-    updateHistoryMap(nextHistory, image.width, image.height);
-    await runStep(roi, pendingNextFixation, nextTrajectory, nextHistory);
+    await runStep(roi, pendingNextFixation, nextTrajectory);
   };
 
   const openImageDialog = () => fileInputRef.current?.click();

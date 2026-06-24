@@ -61,10 +61,15 @@ type SimulationStore = {
   updateSetting: <K extends keyof SimulationSettings>(key: K, value: SimulationSettings[K]) => void;
   toggleDisplay: (key: keyof DisplayState) => void;
   setDragState: (start: Point | null, current: Point | null, dragging: boolean) => void;
-  applyStepResult: (result: StepResult, committedTrajectory: Point[]) => void;
+  applyStepOutcome: (params: {
+    result: StepResult;
+    committedTrajectory: Point[];
+    historyMap: Float32Array;
+    historyMapWidth: number;
+    historyMapHeight: number;
+  }) => void;
   commitPendingFixation: () => Point | null;
   initializeHistoryMap: (width: number, height: number) => void;
-  updateHistoryMap: (map: Float32Array, width: number, height: number) => void;
   clearSimulation: () => void;
 };
 
@@ -140,8 +145,11 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       dragCurrent: current,
       isDragging: dragging,
     }),
-  applyStepResult: (result, committedTrajectory) =>
+  applyStepOutcome: ({ result, committedTrajectory, historyMap, historyMapWidth, historyMapHeight }) =>
     set({
+      historyMap,
+      historyMapWidth,
+      historyMapHeight,
       currentFixation: result.fixation,
       currentRoi: result.roi,
       activeRoiHalfSizePx: result.roi.size * 0.5,
@@ -175,12 +183,6 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       currentFixation: null,
       currentRoi: null,
       activeRoiHalfSizePx: null,
-    }),
-  updateHistoryMap: (map, width, height) =>
-    set({
-      historyMap: map,
-      historyMapWidth: width,
-      historyMapHeight: height,
     }),
   clearSimulation: () =>
     set((state) => ({
