@@ -6,7 +6,6 @@ import type {
   LoadingPhase,
   MouseMode,
   Point,
-  PreprocessPreview,
   RoiRect,
   SimulationSettings,
 } from "../types/simulation";
@@ -48,7 +47,7 @@ type SimulationStore = {
   candidates: Candidate[];
   trajectory: Point[];
   currentHeatmap: Float32Array | null;
-  currentPreprocess: PreprocessPreview | null;
+  currentPreprocess: Float32Array | null;
   dragStart: Point | null;
   dragCurrent: Point | null;
   isDragging: boolean;
@@ -65,7 +64,7 @@ type SimulationStore = {
     roi: RoiRect;
     fixation: Point;
     heatmap: Float32Array;
-    preprocess: PreprocessPreview;
+    preprocess: Float32Array;
     candidates: Candidate[];
     pendingNextFixation: Point | null;
     committedTrajectory: Point[];

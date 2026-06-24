@@ -48,9 +48,4 @@ export type ImageResource = {
   url: string;
 };
 
-export type PreprocessPreview = {
-  rgba: Uint8ClampedArray;
-  size: number;
-};
-
 export type LoadingPhase = "boot" | "webgpu" | "model" | "ready" | "error";
