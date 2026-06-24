@@ -1,6 +1,6 @@
 import type { Candidate, Point, RoiRect } from "../../types/simulation";
 
-const MAX_CANDIDATES = 4096;
+const MAX_CANDIDATES = 256;
 const BYTES_PER_CANDIDATE = 32;
 
 const CANDIDATE_SHADER = /* wgsl */ `
@@ -182,9 +182,9 @@ export class GpuCandidateSelector {
     heatmapBuffer: GPUBuffer;
     historyBuffer: GPUBuffer;
     mapSize: number;
-      thresholdRatio: number;
-      maxHeatmapValue: number;
-      nmsRadius: number;
+    thresholdRatio: number;
+    maxHeatmapValue: number;
+    nmsRadius: number;
     topK: number;
     roi: RoiRect;
     imageWidth: number;

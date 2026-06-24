@@ -10,15 +10,15 @@ export function SimulationStage() {
     refs: { baseCanvasRef, historyCanvasRef, preprocessCanvasRef, heatmapCanvasRef },
     overlay,
     interactionState,
-    loadImageFile,
     startClickStep,
     startBoxStep,
   } = useSimulationEngineContext();
-  const { mode, dragStart, isDragging, setDragState } = useSimulationStore(
+  const { mode, dragStart, isDragging, loadImageFile, setDragState } = useSimulationStore(
     useShallow((state) => ({
       mode: state.mode,
       dragStart: state.dragStart,
       isDragging: state.isDragging,
+      loadImageFile: state.loadImageFile,
       setDragState: state.setDragState,
     })),
   );

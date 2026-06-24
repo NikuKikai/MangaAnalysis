@@ -69,15 +69,16 @@ function ResetIcon() {
 }
 
 export function FloatingPanel() {
-  const { loadImageFile, handleNextStep } = useSimulationEngineContext();
+  const { handleNextStep } = useSimulationEngineContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { mode, display, settings, pendingNextFixation, setMode, updateSetting, toggleDisplay, clearSimulation } =
+  const { mode, display, settings, pendingNextFixation, loadImageFile, setMode, updateSetting, toggleDisplay, clearSimulation } =
     useSimulationStore(
       useShallow((state) => ({
         mode: state.mode,
         display: state.display,
         settings: state.settings,
         pendingNextFixation: state.pendingNextFixation,
+        loadImageFile: state.loadImageFile,
         setMode: state.setMode,
         updateSetting: state.updateSetting,
         toggleDisplay: state.toggleDisplay,

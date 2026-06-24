@@ -56,6 +56,7 @@ type SimulationStore = {
   setError: (message: string) => void;
   setWebgpuAvailable: (available: boolean) => void;
   setImage: (image: ImageResource | null) => void;
+  loadImageFile: (file: File | null) => Promise<void>;
   setMode: (mode: MouseMode) => void;
   updateSetting: <K extends keyof SimulationSettings>(key: K, value: SimulationSettings[K]) => void;
   toggleDisplay: (key: keyof DisplayState) => void;
@@ -128,6 +129,20 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       currentHeatmap: null,
       currentPreprocess: null,
     }),
+  loadImageFile: async (file) => {
+    if (!file) {
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const bitmap = await createImageBitmap(file);
+    get().setImage({
+      bitmap,
+      width: bitmap.width,
+      height: bitmap.height,
+      url,
+    });
+    get().clearSimulation();
+  },
   setMode: (mode) => set({ mode }),
   updateSetting: (key, value) =>
     set((state) => ({

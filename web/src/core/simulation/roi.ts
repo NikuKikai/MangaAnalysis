@@ -63,6 +63,32 @@ export function roiToScreenRect(roi: RoiRect, imageRect: ImageRect, imageWidth: 
   };
 }
 
+export function imageRectToPhysical(imageRect: ImageRect | null, ratio: number): ImageRect | null {
+  if (!imageRect) {
+    return null;
+  }
+  return {
+    x: imageRect.x * ratio,
+    y: imageRect.y * ratio,
+    width: imageRect.width * ratio,
+    height: imageRect.height * ratio,
+  };
+}
+
+export function roiToPhysicalScreenRect(
+  roi: RoiRect | null,
+  imageRect: ImageRect | null,
+  imageWidth: number,
+  imageHeight: number,
+  ratio: number,
+): ImageRect | null {
+  if (!roi || !imageRect || imageWidth <= 0 || imageHeight <= 0) {
+    return null;
+  }
+  const roiRect = roiToScreenRect(roi, imageRect, imageWidth, imageHeight);
+  return imageRectToPhysical(roiRect, ratio);
+}
+
 export function createCenteredSquareRoi(fixation: Point, halfSize: number): RoiRect {
   return {
     x: fixation.x - halfSize,

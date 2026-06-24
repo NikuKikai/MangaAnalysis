@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren, type RefObject } from "react";
-import { useShallow } from "zustand/react/shallow";
 import { GpuCandidateSelector } from "../core/gpu/candidateSelector";
 import { HeatmapRenderer } from "../core/gpu/heatmapRenderer";
 import { HistoryRenderer } from "../core/gpu/historyRenderer";
@@ -11,8 +10,9 @@ import {
   createCenteredSquareRoi,
   createSquareFromDrag,
   fitImageToViewport,
+  imageRectToPhysical,
   roiCenter,
-  roiToScreenRect,
+  roiToPhysicalScreenRect,
   type ImageRect,
 } from "../core/simulation/roi";
 import { useSimulationStore } from "../store/simulationStore";
@@ -47,7 +47,6 @@ type SimulationEngineContextValue = {
     image: ImageResource | null;
     imageRect: ImageRect | null;
   };
-  loadImageFile: (file: File | null) => Promise<void>;
   startClickStep: (point: Point) => Promise<void>;
   startBoxStep: (roi: RoiRect) => Promise<void>;
   handleNextStep: () => Promise<void>;
@@ -92,6 +91,7 @@ async function createEngine(heatmapCanvas: HTMLCanvasElement, historyCanvas: HTM
 const SimulationEngineContext = createContext<SimulationEngineContextValue | null>(null);
 
 export function SimulationProvider({ children }: PropsWithChildren) {
+  // Canvas layers are owned here so rendering effects can address them directly.
   const baseCanvasRef = useRef<HTMLCanvasElement>(null);
   const historyCanvasRef = useRef<HTMLCanvasElement>(null);
   const preprocessCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -100,55 +100,29 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const initStartedRef = useRef(false);
   const [imageRect, setImageRect] = useState<ImageRect | null>(null);
 
+  // Read store fields individually so each dependency stays explicit at call sites.
   const viewport = useViewportSize();
-  const {
-    image,
-    display,
-    settings,
-    historyMap,
-    historyMapWidth,
-    historyMapHeight,
-    currentRoi,
-    activeRoiHalfSizePx,
-    pendingNextFixation,
-    trajectory,
-    currentPreprocess,
-    dragStart,
-    dragCurrent,
-    isDragging,
-    mode,
-    setLoadingState,
-    setError,
-    setWebgpuAvailable,
-    setImage,
-    applyStepOutcome,
-    clearSimulation,
-  } = useSimulationStore(
-    useShallow((state) => ({
-      image: state.image,
-      display: state.display,
-      settings: state.settings,
-      historyMap: state.historyMap,
-      historyMapWidth: state.historyMapWidth,
-      historyMapHeight: state.historyMapHeight,
-      currentRoi: state.currentRoi,
-      activeRoiHalfSizePx: state.activeRoiHalfSizePx,
-      pendingNextFixation: state.pendingNextFixation,
-      trajectory: state.trajectory,
-      currentPreprocess: state.currentPreprocess,
-      dragStart: state.dragStart,
-      dragCurrent: state.dragCurrent,
-      isDragging: state.isDragging,
-      mode: state.mode,
-      setLoadingState: state.setLoadingState,
-      setError: state.setError,
-      setWebgpuAvailable: state.setWebgpuAvailable,
-      setImage: state.setImage,
-      applyStepOutcome: state.applyStepOutcome,
-      clearSimulation: state.clearSimulation,
-    })),
-  );
+  const image = useSimulationStore((state) => state.image);
+  const display = useSimulationStore((state) => state.display);
+  const settings = useSimulationStore((state) => state.settings);
+  const historyMap = useSimulationStore((state) => state.historyMap);
+  const historyMapWidth = useSimulationStore((state) => state.historyMapWidth);
+  const historyMapHeight = useSimulationStore((state) => state.historyMapHeight);
+  const currentRoi = useSimulationStore((state) => state.currentRoi);
+  const activeRoiHalfSizePx = useSimulationStore((state) => state.activeRoiHalfSizePx);
+  const pendingNextFixation = useSimulationStore((state) => state.pendingNextFixation);
+  const trajectory = useSimulationStore((state) => state.trajectory);
+  const currentPreprocess = useSimulationStore((state) => state.currentPreprocess);
+  const dragStart = useSimulationStore((state) => state.dragStart);
+  const dragCurrent = useSimulationStore((state) => state.dragCurrent);
+  const isDragging = useSimulationStore((state) => state.isDragging);
+  const mode = useSimulationStore((state) => state.mode);
+  const setLoadingState = useSimulationStore((state) => state.setLoadingState);
+  const setError = useSimulationStore((state) => state.setError);
+  const setWebgpuAvailable = useSimulationStore((state) => state.setWebgpuAvailable);
+  const applyStepOutcome = useSimulationStore((state) => state.applyStepOutcome);
 
+  // Keep the drag ROI derived from pointer state instead of storing redundant data.
   const dragRoi = useMemo<RoiRect | null>(() => {
     if (mode !== "box" || !dragStart || !dragCurrent || !isDragging) {
       return null;
@@ -156,6 +130,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     return createSquareFromDrag(dragStart, dragCurrent);
   }, [dragCurrent, dragStart, isDragging, mode]);
 
+  // Recompute the fitted image rectangle whenever the viewport or image changes.
   useEffect(() => {
     if (!image) {
       setImageRect(null);
@@ -164,6 +139,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     setImageRect(fitImageToViewport(image.width, image.height, viewport.width, viewport.height));
   }, [image, viewport.height, viewport.width]);
 
+  // Create the GPU engine once after the render targets become available.
   useEffect(() => {
     const initialize = async () => {
       const heatmapCanvas = heatmapCanvasRef.current;
@@ -187,24 +163,22 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     void initialize();
   }, [setError, setLoadingState, setWebgpuAvailable]);
 
+  // Push the latest decoded bitmap into the GPU preprocessor source texture.
   useEffect(() => {
     if (image && engineRef.current) {
       engineRef.current.preprocessor.setSourceImage(image.bitmap);
     }
   }, [image]);
 
+  // Keep the GPU overlay canvases sized to the current viewport in physical pixels.
   useEffect(() => {
-    const baseCanvas = baseCanvasRef.current;
     const historyCanvas = historyCanvasRef.current;
-    const preprocessCanvas = preprocessCanvasRef.current;
     const heatmapCanvas = heatmapCanvasRef.current;
     const engine = engineRef.current;
-    if (!baseCanvas || !historyCanvas || !preprocessCanvas || !heatmapCanvas) {
+    if (!historyCanvas || !heatmapCanvas) {
       return;
     }
 
-    const baseContext = resizeAndClear2dCanvas(baseCanvas, viewport.width, viewport.height);
-    const preprocessContext = resizeAndClear2dCanvas(preprocessCanvas, viewport.width, viewport.height);
     const ratio = window.devicePixelRatio || 1;
     historyCanvas.width = Math.max(1, Math.floor(viewport.width * ratio));
     historyCanvas.height = Math.max(1, Math.floor(viewport.height * ratio));
@@ -216,11 +190,29 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     heatmapCanvas.style.height = `${viewport.height}px`;
     engine?.heatmapRenderer.resize(heatmapCanvas.width, heatmapCanvas.height);
     engine?.historyRenderer.resize(historyCanvas.width, historyCanvas.height);
+  }, [viewport.width, viewport.height]);
 
+  // Redraw the base image only when its source or fitted rectangle changes.
+  useEffect(() => {
+    const baseCanvas = baseCanvasRef.current;
+    if (!baseCanvas) {
+      return;
+    }
+
+    const baseContext = resizeAndClear2dCanvas(baseCanvas, viewport.width, viewport.height);
     if (image && imageRect) {
       drawBaseImage(baseContext, image.bitmap, imageRect);
     }
+  }, [viewport.width, viewport.height, image, imageRect]);
 
+  // Redraw the preprocess preview layer independently from the other overlays.
+  useEffect(() => {
+    const preprocessCanvas = preprocessCanvasRef.current;
+    if (!preprocessCanvas) {
+      return;
+    }
+
+    const preprocessContext = resizeAndClear2dCanvas(preprocessCanvas, viewport.width, viewport.height);
     drawPreprocessPreview({
       context: preprocessContext,
       preview: currentPreprocess?.rgba ?? null,
@@ -231,78 +223,69 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       roi: currentRoi,
       enabled: display.showPreprocess,
     });
-
-    if (engine) {
-      const physicalRatio = window.devicePixelRatio || 1;
-      const scaledImageRect =
-        imageRect
-          ? {
-              x: imageRect.x * physicalRatio,
-              y: imageRect.y * physicalRatio,
-              width: imageRect.width * physicalRatio,
-              height: imageRect.height * physicalRatio,
-            }
-          : null;
-      engine.historyRenderer.updateHistory(historyMap, historyMapWidth, historyMapHeight);
-      engine.historyRenderer.render({
-        imageRect: scaledImageRect,
-        enabled: Boolean(display.showHistoryHeatmap && imageRect),
-      });
-      engine.heatmapRenderer.render({
-        imageRect:
-          scaledImageRect ??
-          ({
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-          } satisfies ImageRect),
-        roiRect:
-          imageRect && currentRoi && image
-            ? (() => {
-                const roiRect = roiToScreenRect(currentRoi, imageRect, image.width, image.height);
-                return {
-                  x: roiRect.x * physicalRatio,
-                  y: roiRect.y * physicalRatio,
-                  width: roiRect.width * physicalRatio,
-                  height: roiRect.height * physicalRatio,
-                };
-              })()
-            : null,
-        enabled: Boolean(display.showHeatmap && imageRect && currentRoi),
-      });
-    }
   }, [
     viewport.width,
     viewport.height,
-    image,
-    imageRect,
-    currentRoi,
     currentPreprocess,
+    imageRect,
+    image,
+    currentRoi,
+    display.showPreprocess,
+  ]);
+
+  // Upload and render the history overlay whenever its data or visibility changes.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) {
+      return;
+    }
+
+    const physicalRatio = window.devicePixelRatio || 1;
+    const scaledImageRect = imageRectToPhysical(imageRect, physicalRatio);
+    engine.historyRenderer.updateHistory(historyMap, historyMapWidth, historyMapHeight);
+    engine.historyRenderer.render({
+      imageRect: scaledImageRect,
+      enabled: Boolean(display.showHistoryHeatmap && imageRect),
+    });
+  }, [
+    imageRect,
     historyMap,
     historyMapWidth,
     historyMapHeight,
-    display.showPreprocess,
-    display.showHeatmap,
     display.showHistoryHeatmap,
   ]);
 
-  const loadImageFile = async (file: File | null) => {
-    if (!file) {
+  // Render the heatmap overlay from the latest GPU buffer and current ROI placement.
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) {
       return;
     }
-    const url = URL.createObjectURL(file);
-    const bitmap = await createImageBitmap(file);
-    engineRef.current?.preprocessor.setSourceImage(bitmap);
-    setImage({
-      bitmap,
-      width: bitmap.width,
-      height: bitmap.height,
-      url,
-    });
-    clearSimulation();
-  };
 
+    const physicalRatio = window.devicePixelRatio || 1;
+    const scaledImageRect = imageRectToPhysical(imageRect, physicalRatio);
+    const scaledRoiRect = roiToPhysicalScreenRect(
+      currentRoi,
+      imageRect,
+      image?.width ?? 0,
+      image?.height ?? 0,
+      physicalRatio,
+    );
+    engine.heatmapRenderer.render({
+      imageRect:
+        scaledImageRect ??
+        ({
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        } satisfies ImageRect),
+      roiRect: scaledRoiRect,
+      enabled: Boolean(display.showHeatmap && imageRect && currentRoi),
+    });
+  }, [image, imageRect, currentRoi, display.showHeatmap]);
+
+  // Run one simulation step: update history, preprocess ROI input, infer heatmap, then select candidates.
   const runStep = async (roi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
     const engine = engineRef.current;
     if (!engine || !image) {
@@ -363,6 +346,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     });
   };
 
+  // Start a click-driven step using the configured square ROI around the click point.
   const startClickStep = async (point: Point) => {
     if (!image) {
       return;
@@ -372,11 +356,13 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     await runStep(roi, point, [point]);
   };
 
+  // Start a box-driven step using the user-drawn ROI and its center as fixation.
   const startBoxStep = async (roi: RoiRect) => {
     const fixation = roiCenter(roi);
     await runStep(roi, fixation, [fixation]);
   };
 
+  // Continue the trajectory from the pending fixation chosen in the previous step.
   const handleNextStep = async () => {
     if (!image || !pendingNextFixation) {
       return;
@@ -386,6 +372,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation]);
   };
 
+  // Expose rendering refs plus interaction entry points to the stage and controls.
   const value: SimulationEngineContextValue = {
     refs: {
       baseCanvasRef,
@@ -405,7 +392,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       image,
       imageRect,
     },
-    loadImageFile,
     startClickStep,
     startBoxStep,
     handleNextStep,
