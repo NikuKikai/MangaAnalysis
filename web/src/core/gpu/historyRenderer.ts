@@ -256,7 +256,7 @@ export class HistoryRenderer {
   initialize(width: number, height: number): void {
     this.mapWidth = width;
     this.mapHeight = height;
-    this.normalizationMaxValue = 1;
+    this.normalizationMaxValue = 2;
     if (width <= 0 || height <= 0) {
       return;
     }
@@ -295,7 +295,6 @@ export class HistoryRenderer {
     pass.dispatchWorkgroups(Math.ceil(this.mapWidth / 8), Math.ceil(this.mapHeight / 8), 1);
     pass.end();
     this.device.queue.submit([encoder.finish()]);
-    this.normalizationMaxValue = 1 / Math.max(1e-3, 1 - clampedDecay);
   }
 
   getBuffer(): GPUBuffer {

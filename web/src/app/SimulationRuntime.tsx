@@ -321,6 +321,14 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       image.height * settings.historySigmaRatio,
       settings.historyDecay,
     );
+    {
+      const physicalRatio = window.devicePixelRatio || 1;
+      const scaledImageRect = imageRectToPhysical(imageRect, physicalRatio);
+      engine.historyRenderer.render({
+        imageRect: scaledImageRect,
+        enabled: Boolean(display.showHistoryHeatmap && imageRect),
+      });
+    }
 
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
     engine.preprocessRenderer.updatePreview(input, modelSize());
