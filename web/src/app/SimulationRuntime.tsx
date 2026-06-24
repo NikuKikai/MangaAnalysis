@@ -330,12 +330,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
     engine.currentPreprocess = input;
     const heatmap = await engine.session.predict(input);
-    let maxHeatmapValue = 0;
-    for (let index = 0; index < heatmap.length; index += 1) {
-      if (heatmap[index] > maxHeatmapValue) {
-        maxHeatmapValue = heatmap[index];
-      }
-    }
     const nmsRadius = Math.max(1, Math.round((image.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
     const distanceSigma = Math.max(1, image.height * settings.distanceSigmaRatio);
     engine.heatmapRenderer.updateHeatmap(heatmap, modelSize());
@@ -343,8 +337,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       heatmapBuffer: engine.heatmapRenderer.getBuffer(),
       historyBuffer: engine.historyRenderer.getBuffer(),
       mapSize: modelSize(),
-      thresholdRatio: settings.thresholdRatio,
-      maxHeatmapValue,
       nmsRadius,
       topK: settings.topK,
       roi,
@@ -366,8 +358,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     applyStepOutcome({
       roi,
       fixation,
-      heatmap,
-      preprocess: input,
       candidates: scoredCandidates,
       pendingNextFixation,
       committedTrajectory,
