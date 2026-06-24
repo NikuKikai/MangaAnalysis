@@ -9,7 +9,6 @@ import type {
   PreprocessPreview,
   RoiRect,
   SimulationSettings,
-  StepResult,
 } from "../types/simulation";
 
 const defaultSettings: SimulationSettings = {
@@ -62,7 +61,12 @@ type SimulationStore = {
   toggleDisplay: (key: keyof DisplayState) => void;
   setDragState: (start: Point | null, current: Point | null, dragging: boolean) => void;
   applyStepOutcome: (params: {
-    result: StepResult;
+    roi: RoiRect;
+    fixation: Point;
+    heatmap: Float32Array;
+    preprocess: PreprocessPreview;
+    candidates: Candidate[];
+    pendingNextFixation: Point | null;
     committedTrajectory: Point[];
     historyMap: Float32Array;
     historyMapWidth: number;
@@ -145,18 +149,29 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       dragCurrent: current,
       isDragging: dragging,
     }),
-  applyStepOutcome: ({ result, committedTrajectory, historyMap, historyMapWidth, historyMapHeight }) =>
+  applyStepOutcome: ({
+    roi,
+    fixation,
+    heatmap,
+    preprocess,
+    candidates,
+    pendingNextFixation,
+    committedTrajectory,
+    historyMap,
+    historyMapWidth,
+    historyMapHeight,
+  }) =>
     set({
       historyMap,
       historyMapWidth,
       historyMapHeight,
-      currentFixation: result.fixation,
-      currentRoi: result.roi,
-      activeRoiHalfSizePx: result.roi.size * 0.5,
-      pendingNextFixation: result.pendingNextFixation,
-      candidates: result.candidates,
-      currentHeatmap: result.heatmap,
-      currentPreprocess: result.preprocess,
+      currentFixation: fixation,
+      currentRoi: roi,
+      activeRoiHalfSizePx: roi.size * 0.5,
+      pendingNextFixation,
+      candidates,
+      currentHeatmap: heatmap,
+      currentPreprocess: preprocess,
       trajectory: committedTrajectory,
     }),
   commitPendingFixation: () => {

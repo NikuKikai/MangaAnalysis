@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren, type RefObject } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { GpuCandidateSelector } from "../core/gpu/candidateSelector";
 import { HeatmapRenderer } from "../core/gpu/heatmapRenderer";
+import { HistoryRenderer } from "../core/gpu/historyRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { SaliencySession } from "../core/onnx/saliencySession";
-import { drawBaseImage, drawHistoryHeatmap, drawPreprocessPreview, resizeAndClear2dCanvas } from "../core/render/draw";
-import { extractCandidates, normalizeHeatmap } from "../core/simulation/candidates";
+import { drawBaseImage, drawPreprocessPreview, resizeAndClear2dCanvas } from "../core/render/draw";
 import { addFixationToHistory, createHistoryMap } from "../core/simulation/history";
 import {
   createCenteredSquareRoi,
@@ -15,13 +16,15 @@ import {
   type ImageRect,
 } from "../core/simulation/roi";
 import { useSimulationStore } from "../store/simulationStore";
-import type { ImageResource, Point, PreprocessPreview, RoiRect, StepResult } from "../types/simulation";
+import type { ImageResource, Point, PreprocessPreview, RoiRect } from "../types/simulation";
 import { useViewportSize } from "./useViewportSize";
 
 type Engine = {
   device: GPUDevice;
   preprocessor: RoiPreprocessor;
   heatmapRenderer: HeatmapRenderer;
+  historyRenderer: HistoryRenderer;
+  candidateSelector: GpuCandidateSelector;
   session: SaliencySession;
 };
 
@@ -69,7 +72,7 @@ function buildPreprocessPreview(input: Float32Array): PreprocessPreview {
   return { rgba, size };
 }
 
-async function createEngine(heatmapCanvas: HTMLCanvasElement): Promise<Engine> {
+async function createEngine(heatmapCanvas: HTMLCanvasElement, historyCanvas: HTMLCanvasElement): Promise<Engine> {
   if (!navigator.gpu) {
     throw new Error("WebGPU is unavailable in this browser.");
   }
@@ -80,8 +83,10 @@ async function createEngine(heatmapCanvas: HTMLCanvasElement): Promise<Engine> {
   const device = await adapter.requestDevice();
   const preprocessor = new RoiPreprocessor(device);
   const heatmapRenderer = new HeatmapRenderer(device, heatmapCanvas);
+  const historyRenderer = new HistoryRenderer(device, historyCanvas);
+  const candidateSelector = new GpuCandidateSelector(device);
   const session = await SaliencySession.create();
-  return { device, preprocessor, heatmapRenderer, session };
+  return { device, preprocessor, heatmapRenderer, historyRenderer, candidateSelector, session };
 }
 
 const SimulationEngineContext = createContext<SimulationEngineContextValue | null>(null);
@@ -162,13 +167,14 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     const initialize = async () => {
       const heatmapCanvas = heatmapCanvasRef.current;
-      if (!heatmapCanvas || initStartedRef.current) {
+      const historyCanvas = historyCanvasRef.current;
+      if (!heatmapCanvas || !historyCanvas || initStartedRef.current) {
         return;
       }
       initStartedRef.current = true;
       try {
         setLoadingState("webgpu", "Initializing WebGPU");
-        const engine = await createEngine(heatmapCanvas);
+        const engine = await createEngine(heatmapCanvas, historyCanvas);
         engineRef.current = engine;
         setWebgpuAvailable(true);
         setLoadingState("model", "Loading Model");
@@ -198,27 +204,22 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     }
 
     const baseContext = resizeAndClear2dCanvas(baseCanvas, viewport.width, viewport.height);
-    const historyContext = resizeAndClear2dCanvas(historyCanvas, viewport.width, viewport.height);
     const preprocessContext = resizeAndClear2dCanvas(preprocessCanvas, viewport.width, viewport.height);
     const ratio = window.devicePixelRatio || 1;
+    historyCanvas.width = Math.max(1, Math.floor(viewport.width * ratio));
+    historyCanvas.height = Math.max(1, Math.floor(viewport.height * ratio));
+    historyCanvas.style.width = `${viewport.width}px`;
+    historyCanvas.style.height = `${viewport.height}px`;
     heatmapCanvas.width = Math.max(1, Math.floor(viewport.width * ratio));
     heatmapCanvas.height = Math.max(1, Math.floor(viewport.height * ratio));
     heatmapCanvas.style.width = `${viewport.width}px`;
     heatmapCanvas.style.height = `${viewport.height}px`;
     engine?.heatmapRenderer.resize(heatmapCanvas.width, heatmapCanvas.height);
+    engine?.historyRenderer.resize(historyCanvas.width, historyCanvas.height);
 
     if (image && imageRect) {
       drawBaseImage(baseContext, image.bitmap, imageRect);
     }
-
-    drawHistoryHeatmap({
-      context: historyContext,
-      historyMap,
-      historyMapWidth,
-      historyMapHeight,
-      imageRect,
-      enabled: display.showHistoryHeatmap,
-    });
 
     drawPreprocessPreview({
       context: preprocessContext,
@@ -233,21 +234,29 @@ export function SimulationProvider({ children }: PropsWithChildren) {
 
     if (engine) {
       const physicalRatio = window.devicePixelRatio || 1;
+      const scaledImageRect =
+        imageRect
+          ? {
+              x: imageRect.x * physicalRatio,
+              y: imageRect.y * physicalRatio,
+              width: imageRect.width * physicalRatio,
+              height: imageRect.height * physicalRatio,
+            }
+          : null;
+      engine.historyRenderer.updateHistory(historyMap, historyMapWidth, historyMapHeight);
+      engine.historyRenderer.render({
+        imageRect: scaledImageRect,
+        enabled: Boolean(display.showHistoryHeatmap && imageRect),
+      });
       engine.heatmapRenderer.render({
         imageRect:
-          imageRect
-            ? {
-                x: imageRect.x * physicalRatio,
-                y: imageRect.y * physicalRatio,
-                width: imageRect.width * physicalRatio,
-                height: imageRect.height * physicalRatio,
-              }
-            : ({
-                x: 0,
-                y: 0,
-                width: 0,
-                height: 0,
-              } satisfies ImageRect),
+          scaledImageRect ??
+          ({
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+          } satisfies ImageRect),
         roiRect:
           imageRect && currentRoi && image
             ? (() => {
@@ -305,45 +314,48 @@ export function SimulationProvider({ children }: PropsWithChildren) {
 
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
     const preprocess = buildPreprocessPreview(input);
-    const rawHeatmap = await engine.session.predict(input);
-    const heatmap = normalizeHeatmap(rawHeatmap);
+    const heatmap = await engine.session.predict(input);
+    let maxHeatmapValue = 0;
+    for (let index = 0; index < heatmap.length; index += 1) {
+      if (heatmap[index] > maxHeatmapValue) {
+        maxHeatmapValue = heatmap[index];
+      }
+    }
     const nmsRadius = Math.max(1, Math.round((image.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
     const distanceSigma = Math.max(1, image.height * settings.distanceSigmaRatio);
-    const scoredCandidates = extractCandidates({
-      heatmap,
-      mapWidth: modelSize(),
-      mapHeight: modelSize(),
+    engine.heatmapRenderer.updateHeatmap(heatmap, modelSize());
+    engine.historyRenderer.updateHistory(nextHistoryMap, image.width, image.height);
+    const scoredCandidates = await engine.candidateSelector.select({
+      heatmapBuffer: engine.heatmapRenderer.getBuffer(),
+      historyBuffer: engine.historyRenderer.getBuffer(),
+      mapSize: modelSize(),
       thresholdRatio: settings.thresholdRatio,
+      maxHeatmapValue,
       nmsRadius,
       topK: settings.topK,
       roi,
       imageWidth: image.width,
       imageHeight: image.height,
       currentFixation: fixation,
-      historyMap: nextHistoryMap,
       historyMapWidth: image.width,
       historyMapHeight: image.height,
       historyAlpha: settings.historyAlpha,
       distanceSigma,
     });
-
-    engine.heatmapRenderer.updateHeatmap(heatmap, modelSize());
-    const stepResult: StepResult = {
+    const pendingNextFixation =
+      scoredCandidates.length > 0
+        ? {
+            x: scoredCandidates[0].pageX,
+            y: scoredCandidates[0].pageY,
+          }
+        : null;
+    applyStepOutcome({
       roi,
       fixation,
       heatmap,
       preprocess,
       candidates: scoredCandidates,
-      pendingNextFixation:
-        scoredCandidates.length > 0
-          ? {
-              x: scoredCandidates[0].pageX,
-              y: scoredCandidates[0].pageY,
-            }
-          : null,
-    };
-    applyStepOutcome({
-      result: stepResult,
+      pendingNextFixation,
       committedTrajectory,
       historyMap: nextHistoryMap,
       historyMapWidth: image.width,

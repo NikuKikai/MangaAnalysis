@@ -41,15 +41,6 @@ export type Candidate = {
   finalScore: number;
 };
 
-export type StepResult = {
-  roi: RoiRect;
-  fixation: Point;
-  heatmap: Float32Array;
-  preprocess: PreprocessPreview;
-  candidates: Candidate[];
-  pendingNextFixation: Point | null;
-};
-
 export type ImageResource = {
   bitmap: ImageBitmap;
   width: number;
