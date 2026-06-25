@@ -118,6 +118,15 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const setWebgpuAvailable = useSimulationStore((state) => state.setWebgpuAvailable);
   const applyStepOutcome = useSimulationStore((state) => state.applyStepOutcome);
 
+  const renderHistoryOverlay = (engine: Engine, nextImageRect: ImageRect | null) => {
+    const physicalRatio = window.devicePixelRatio || 1;
+    const scaledImageRect = imageRectToPhysical(nextImageRect, physicalRatio);
+    engine.historyRenderer.render({
+      imageRect: scaledImageRect,
+      enabled: Boolean(display.showHistoryHeatmap && nextImageRect),
+    });
+  };
+
   // Keep the drag ROI derived from pointer state instead of storing redundant data.
   const dragRoi = useMemo<RoiRect | null>(() => {
     if (mode !== "box" || !dragStart || !dragCurrent || !isDragging) {
@@ -167,8 +176,9 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       engineRef.current.historyMapWidth = image.width;
       engineRef.current.historyMapHeight = image.height;
       engineRef.current.historyRenderer.initialize(image.width, image.height);
+      renderHistoryOverlay(engineRef.current, imageRect);
     }
-  }, [image]);
+  }, [image, imageRect, display.showHistoryHeatmap]);
 
   // Reset GPU-side simulation buffers when the logical simulation state is cleared.
   useEffect(() => {
@@ -186,7 +196,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     engine.historyMapWidth = image.width;
     engine.historyMapHeight = image.height;
     engine.historyRenderer.initialize(image.width, image.height);
-  }, [image, trajectory.length, currentRoi, currentFixation, pendingNextFixation]);
+    renderHistoryOverlay(engine, imageRect);
+  }, [image, imageRect, trajectory.length, currentRoi, currentFixation, pendingNextFixation, display.showHistoryHeatmap]);
 
   // Keep the GPU overlay canvases sized to the current viewport in physical pixels.
   useEffect(() => {
@@ -266,12 +277,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       return;
     }
 
-    const physicalRatio = window.devicePixelRatio || 1;
-    const scaledImageRect = imageRectToPhysical(imageRect, physicalRatio);
-    engine.historyRenderer.render({
-      imageRect: scaledImageRect,
-      enabled: Boolean(display.showHistoryHeatmap && imageRect),
-    });
+    renderHistoryOverlay(engine, imageRect);
   }, [imageRect, display.showHistoryHeatmap]);
 
   // Render the heatmap overlay from the latest GPU buffer and current ROI placement.
@@ -322,12 +328,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       settings.historyDecay,
     );
     {
-      const physicalRatio = window.devicePixelRatio || 1;
-      const scaledImageRect = imageRectToPhysical(imageRect, physicalRatio);
-      engine.historyRenderer.render({
-        imageRect: scaledImageRect,
-        enabled: Boolean(display.showHistoryHeatmap && imageRect),
-      });
+      renderHistoryOverlay(engine, imageRect);
     }
 
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
