@@ -200,7 +200,7 @@ export class PreprocessRenderer {
       });
       this.bindGroup = this.createBindGroup();
     }
-    this.device.queue.writeBuffer(this.preprocessBuffer, 0, preview);
+    this.device.queue.writeBuffer(this.preprocessBuffer, 0, preview.buffer, preview.byteOffset, preview.byteLength);
   }
 
   render(params: {

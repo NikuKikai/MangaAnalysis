@@ -146,7 +146,7 @@ type CandidateRecord = {
   modelY: number;
   pageX: number;
   pageY: number;
-  heatmapValue: number;
+  saliencyScore: number;
   historyValue: number;
   inhibitionScore: number;
   distanceScore: number;
@@ -295,7 +295,7 @@ export class GpuCandidateSelector {
         modelY: raw.getUint32(base + 4, true),
         pageX: raw.getFloat32(base + 8, true),
         pageY: raw.getFloat32(base + 12, true),
-        heatmapValue,
+        saliencyScore: heatmapValue,
         historyValue,
         inhibitionScore,
         distanceScore: distanceWeight,

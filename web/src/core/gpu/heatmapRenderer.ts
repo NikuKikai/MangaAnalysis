@@ -202,7 +202,7 @@ export class HeatmapRenderer {
       });
       this.bindGroup = this.createBindGroup();
     }
-    this.device.queue.writeBuffer(this.heatmapBuffer, 0, heatmap);
+    this.device.queue.writeBuffer(this.heatmapBuffer, 0, heatmap.buffer, heatmap.byteOffset, heatmap.byteLength);
   }
 
   getBuffer(): GPUBuffer {
