@@ -33,9 +33,6 @@ input {
 svg {
   width: 18px;
   height: 18px;
-  fill: currentColor;
-  stroke: currentColor;
-  stroke-width: 1.5;
 }
 
 .app-shell {
@@ -188,8 +185,8 @@ svg {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px;
+  gap: 6px;
+  padding: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   background: rgba(12, 14, 17, 0.78);
@@ -207,24 +204,72 @@ svg {
   right: 10px;
 }
 
-.panel-bottom-right {
-  right: 10px;
-  bottom: 10px;
+.panel-control {
+  flex-direction: column;
+  align-items: stretch;
+  width: min(296px, calc(100vw - 20px));
 }
 
 .mode-group {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-right: 4px;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  flex-wrap: nowrap;
 }
 
-.sliders {
+.settings-sections {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
-  min-width: 196px;
-  gap: 10px;
+  gap: 9px;
+}
+
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-section-title {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(240, 244, 246, 0.78);
+}
+
+.settings-section-toggle {
+  margin-left: auto;
+}
+
+.settings-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .slider-row {
@@ -263,23 +308,21 @@ svg {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.03);
   color: rgba(240, 244, 246, 0.74);
   cursor: pointer;
   transition:
-    transform 140ms ease,
     color 140ms ease,
     border-color 140ms ease,
     background 140ms ease;
 }
 
 .icon-button:hover {
-  transform: translateY(-1px);
   color: rgba(255, 247, 237, 0.94);
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.07);
@@ -288,13 +331,109 @@ svg {
 .icon-button:disabled {
   cursor: default;
   opacity: 0.4;
-  transform: none;
 }
 
 .icon-button.is-active {
   color: #ffd49b;
   border-color: rgba(255, 195, 110, 0.42);
   background: rgba(255, 179, 88, 0.12);
+}
+
+.dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(3, 5, 7, 0.56);
+  backdrop-filter: blur(6px);
+}
+
+.dialog-panel {
+  width: min(640px, 100%);
+  min-height: 240px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  background: rgba(12, 14, 17, 0.96);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+}
+
+.dialog-content {
+  min-height: 240px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: text;
+}
+
+.info-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  text-align: center;
+}
+
+.info-line {
+  margin: 0;
+  color: rgba(228, 233, 238, 0.82);
+  font-size: 14px;
+  line-height: 1.65;
+  letter-spacing: 0.02em;
+}
+
+.info-line:first-child {
+  color: rgba(248, 250, 252, 0.98);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.info-contact {
+  font-size: 16px;
+  color: rgba(240, 244, 248, 0.92);
+}
+
+.info-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+.info-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: rgba(244, 246, 248, 0.9);
+  background: rgba(255, 255, 255, 0.04);
+  text-decoration: none;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+}
+
+.info-link svg {
+  width: 20px;
+  height: 20px;
+}
+
+.info-link:hover {
+  color: rgba(255, 247, 237, 0.98);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .loading-overlay {
@@ -364,15 +503,6 @@ svg {
 
   .panel-top-right {
     left: 10px;
-    right: auto;
-    top: auto;
-    bottom: 10px;
-  }
-
-  .panel-bottom-right {
-    left: 10px;
     right: 10px;
-    bottom: 58px;
-    min-width: 0;
   }
 }
