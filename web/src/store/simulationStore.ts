@@ -18,7 +18,7 @@ const defaultSettings: SimulationSettings = {
   historyDecay: 0.94,
   historyAlpha: 3,
   distanceSigmaRatio: 0.183,
-  thresholdRatio: 0.55,
+  thresholdRatio: 0.15,
   nmsRadiusRatio: 0.013,
   topK: 8,
 };

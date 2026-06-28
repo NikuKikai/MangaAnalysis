@@ -97,6 +97,15 @@ export function createCenteredSquareRoi(fixation: Point, halfSize: number): RoiR
   };
 }
 
+export function createFullPageSquareRoi(imageWidth: number, imageHeight: number): RoiRect {
+  const size = Math.max(imageWidth, imageHeight);
+  return {
+    x: 0,
+    y: 0,
+    size,
+  };
+}
+
 export function createSquareFromDrag(anchor: Point, current: Point): RoiRect {
   const dx = current.x - anchor.x;
   const dy = current.y - anchor.y;

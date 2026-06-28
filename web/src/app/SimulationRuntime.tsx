@@ -8,6 +8,7 @@ import { SaliencySession } from "../core/onnx/saliencySession";
 import { drawBaseImage, resizeAndClear2dCanvas } from "../core/utils/canvas2d";
 import {
   createCenteredSquareRoi,
+  createFullPageSquareRoi,
   createSquareFromDrag,
   fitImageToViewport,
   imageRectToPhysical,
@@ -16,7 +17,7 @@ import {
   type ImageRect,
 } from "../core/utils/roi";
 import { useSimulationStore } from "../store/simulationStore";
-import type { ImageResource, Point, RoiRect } from "../types/simulation";
+import type { Candidate, ImageResource, Point, RoiRect } from "../types/simulation";
 import { useViewportSize } from "./useViewportSize";
 
 type Engine = {
@@ -310,27 +311,10 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     });
   }, [image, imageRect, currentRoi, display.showHeatmap]);
 
-  // Run one simulation step: update history, preprocess ROI input, infer heatmap, then select candidates.
-  const runStep = async (roi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
-    const engine = engineRef.current;
-    if (!engine || !image) {
-      return;
-    }
-    if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
-      engine.historyMapWidth = image.width;
-      engine.historyMapHeight = image.height;
-      engine.historyRenderer.initialize(image.width, image.height);
-    }
-    engine.historyRenderer.accumulateFixation(
-      fixation.x,
-      fixation.y,
-      image.height * settings.historySigmaRatio,
-      settings.historyDecay,
-    );
-    {
-      renderHistoryOverlay(engine, imageRect);
-    }
+  const filterCandidatesByThreshold = (candidates: Candidate[]) =>
+    candidates.filter((candidate) => candidate.finalScore >= settings.thresholdRatio);
 
+  const runStepOnce = async (engine: Engine, roi: RoiRect, fixation: Point) => {
     const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
     engine.preprocessRenderer.updatePreview(input, modelSize());
     const heatmap = await engine.session.predict(input);
@@ -352,6 +336,40 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       historyAlpha: settings.historyAlpha,
       distanceSigma,
     });
+    console.log(scoredCandidates.map(c => c.finalScore));
+    return {
+      roi,
+      candidates: filterCandidatesByThreshold(scoredCandidates),
+    };
+  };
+
+  // Run one simulation step: update history, preprocess ROI input, infer heatmap, then select candidates.
+  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
+    const engine = engineRef.current;
+    if (!engine || !image) {
+      return;
+    }
+    if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
+      engine.historyMapWidth = image.width;
+      engine.historyMapHeight = image.height;
+      engine.historyRenderer.initialize(image.width, image.height);
+    }
+    engine.historyRenderer.accumulateFixation(
+      fixation.x,
+      fixation.y,
+      image.height * settings.historySigmaRatio,
+      settings.historyDecay,
+    );
+    {
+      renderHistoryOverlay(engine, imageRect);
+    }
+
+    let stepResult = await runStepOnce(engine, initialRoi, fixation);
+    if (stepResult.candidates.length === 0) {
+      stepResult = await runStepOnce(engine, createFullPageSquareRoi(image.width, image.height), fixation);
+    }
+
+    const { roi, candidates: scoredCandidates } = stepResult;
     const pendingNextFixation =
       scoredCandidates.length > 0
         ? {
