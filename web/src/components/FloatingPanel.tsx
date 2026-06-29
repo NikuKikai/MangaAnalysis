@@ -5,9 +5,11 @@ import { FaGithub, FaXTwitter } from "react-icons/fa6";
 import { LuMousePointer2 } from "react-icons/lu";
 import { PiRectangle } from "react-icons/pi";
 import { TbInfoCircle } from "react-icons/tb";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useSimulationEngineContext } from "../app/SimulationRuntime";
 import { IconButton } from "./IconButton";
+import type { AppLanguage } from "../i18n/resources";
 import { useSimulationStore } from "../store/simulationStore";
 
 type SliderControlProps = {
@@ -50,6 +52,7 @@ function SettingsSection({ title, toggle, children }: SettingsSectionProps) {
 }
 
 export function InfoDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   if (!open) {
     return null;
   }
@@ -60,21 +63,21 @@ export function InfoDialog({ open, onClose }: { open: boolean; onClose: () => vo
         className="dialog-panel"
         role="dialog"
         aria-modal="true"
-        aria-label="Information"
+        aria-label={t("panel.info.dialogLabel")}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="dialog-content">
           <div className="info-card">
-            <p className="info-line">Author: NikuKikai</p>
-            <p className="info-line info-contact">Contact: nikukikai@gmail.com</p>
-            <div className="info-links" aria-label="Social links">
+            <p className="info-line">{t("panel.info.author")}</p>
+            <p className="info-line info-contact">{t("panel.info.contact")}</p>
+            <div className="info-links" aria-label={t("panel.info.socialLinks")}>
               <a
                 className="info-link"
                 href="https://github.com/nikukikai"
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="GitHub"
-                title="GitHub"
+                aria-label={t("panel.info.github")}
+                title={t("panel.info.github")}
               >
                 <FaGithub />
               </a>
@@ -83,8 +86,8 @@ export function InfoDialog({ open, onClose }: { open: boolean; onClose: () => vo
                 href="https://x.com/nikukikai"
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="X"
-                title="X"
+                aria-label={t("panel.info.x")}
+                title={t("panel.info.x")}
               >
                 <FaXTwitter />
               </a>
@@ -97,6 +100,7 @@ export function InfoDialog({ open, onClose }: { open: boolean; onClose: () => vo
 }
 
 export function FloatingPanel() {
+  const { t, i18n } = useTranslation();
   const { handleNextStep } = useSimulationEngineContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [panelExpanded, setPanelExpanded] = useState(true);
@@ -146,10 +150,13 @@ export function FloatingPanel() {
     imageHeight > 0 && referenceRoiSizePx > 0
       ? Math.max(1, Math.round((imageHeight * settings.nmsRadiusRatio * 512) / referenceRoiSizePx))
       : 0;
-  const formatPixels = (value: number) => (value > 0 ? `${value.toFixed(1)} px` : "unknown");
-  const imageHeightLabel = imageHeight > 0 ? `${imageHeight} px` : "unknown";
-  const roiSizeLabel = referenceRoiSizePx > 0 ? `${referenceRoiSizePx.toFixed(1)} px` : "unknown";
-  const roiSourceLabel = currentRoi ? "current ROI size" : "default click ROI size";
+  const formatPixels = (value: number) => (value > 0 ? `${value.toFixed(1)} px` : t("panel.unknown"));
+  const imageHeightLabel = imageHeight > 0 ? `${imageHeight} px` : t("panel.unknown");
+  const roiSizeLabel = referenceRoiSizePx > 0 ? `${referenceRoiSizePx.toFixed(1)} px` : t("panel.unknown");
+  const roiSourceLabel = currentRoi ? t("panel.roiSource.current") : t("panel.roiSource.defaultClick");
+  const handleLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    void i18n.changeLanguage(event.target.value as AppLanguage);
+  };
 
   return (
     <>
@@ -162,49 +169,62 @@ export function FloatingPanel() {
       />
       <div className="panel panel-top-right panel-control">
         <div className="panel-toolbar">
-          <IconButton label="Open Image" onClick={openImageDialog}>
+          <IconButton label={t("panel.buttons.openImage")} onClick={openImageDialog}>
             <IoFolderOpenOutline />
           </IconButton>
-          <div className="mode-group" role="group" aria-label="Mouse mode">
-            <IconButton active={mode === "click"} label="Click Mode" onClick={() => setMode("click")}>
+          <div className="mode-group" role="group" aria-label={`${t("panel.buttons.clickMode")} / ${t("panel.buttons.boxMode")}`}>
+            <IconButton active={mode === "click"} label={t("panel.buttons.clickMode")} onClick={() => setMode("click")}>
               <LuMousePointer2 />
             </IconButton>
-            <IconButton active={mode === "box"} label="Box Mode" onClick={() => setMode("box")}>
+            <IconButton active={mode === "box"} label={t("panel.buttons.boxMode")} onClick={() => setMode("box")}>
               <PiRectangle />
             </IconButton>
           </div>
-          <IconButton label="Next Step" disabled={nextDisabled} onClick={() => void handleNextStep()}>
+          <IconButton label={t("panel.buttons.nextStep")} disabled={nextDisabled} onClick={() => void handleNextStep()}>
             <IoPlay />
           </IconButton>
-          <IconButton label="Reset" onClick={clearSimulation}>
+          <IconButton label={t("panel.buttons.reset")} onClick={clearSimulation}>
             <IoRefresh />
           </IconButton>
           <div className="toolbar-spacer" />
-          <IconButton label="Information" onClick={() => setInfoOpen(true)}>
+          <IconButton label={t("panel.buttons.information")} onClick={() => setInfoOpen(true)}>
             <TbInfoCircle />
           </IconButton>
           <IconButton
             active={panelExpanded}
-            label={panelExpanded ? "Collapse Panel" : "Expand Panel"}
+            label={panelExpanded ? t("panel.buttons.collapse") : t("panel.buttons.expand")}
             onClick={() => setPanelExpanded((value) => !value)}
           >
             <HiBars3 />
           </IconButton>
         </div>
-
         {panelExpanded ? (
           <div className="settings-sections">
+            <div className="panel-language-row">
+              <label className="panel-language-label" htmlFor="language-select">
+                {t("panel.language.label")}
+              </label>
+              <select
+                id="language-select"
+                className="panel-language-select"
+                value={(i18n.resolvedLanguage ?? i18n.language) as AppLanguage}
+                onChange={handleLanguageChange}
+              >
+                <option value="en">{t("panel.language.en")}</option>
+                <option value="ja">{t("panel.language.ja")}</option>
+              </select>
+            </div>
             <SettingsSection
-              title="preprocess"
+              title={t("panel.sections.preprocess")}
               toggle={
-                <IconButton active={display.showPreprocess} label="Toggle Preprocess View" onClick={() => toggleDisplay("showPreprocess")}>
+                <IconButton active={display.showPreprocess} label={t("panel.buttons.togglePreprocess")} onClick={() => toggleDisplay("showPreprocess")}>
                   <IoEyeOutline />
                 </IconButton>
               }
             >
               <SliderControl
-                label="Blur"
-                title={`Maximum blur radius used outside\nthe clear fovea.\nCurrent value: ${settings.maxBlurStrength.toFixed(2)} px.\nLarger values make peripheral regions blurrier\nand harder to read.\nSmaller values keep more detail.`}
+                label={t("panel.sliders.blur.label")}
+                title={t("panel.sliders.blur.tooltip", { value: settings.maxBlurStrength.toFixed(2) })}
                 min="0"
                 max="32"
                 step="0.25"
@@ -213,8 +233,12 @@ export function FloatingPanel() {
                 onChange={(value) => updateSetting("maxBlurStrength", value)}
               />
               <SliderControl
-                label="Fovea"
-                title={`Radius of the sharp center area\naround the fixation point.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.clearRadiusRatio.toFixed(3)})\n= ${formatPixels(clearRadiusPx)}.\nLarger values keep a wider area unblurred.\nSmaller values make blur start closer\nto the fixation point.`}
+                label={t("panel.sliders.fovea.label")}
+                title={t("panel.sliders.fovea.tooltip", {
+                  imageHeight: imageHeightLabel,
+                  ratio: settings.clearRadiusRatio.toFixed(3),
+                  pixels: formatPixels(clearRadiusPx),
+                })}
                 min="0.01"
                 max="0.2"
                 step="0.005"
@@ -225,16 +249,21 @@ export function FloatingPanel() {
             </SettingsSection>
 
             <SettingsSection
-              title="saliency"
+              title={t("panel.sections.saliency")}
               toggle={
-                <IconButton active={display.showHeatmap} label="Toggle Saliency View" onClick={() => toggleDisplay("showHeatmap")}>
+                <IconButton active={display.showHeatmap} label={t("panel.buttons.toggleSaliency")} onClick={() => toggleDisplay("showHeatmap")}>
                   <IoEyeOutline />
                 </IconButton>
               }
             >
               <SliderControl
-                label="Box"
-                title={`Half-size of the square ROI used in click mode\nand as the default size for Next Step.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.clickRoiHalfSizeRatio.toFixed(3)})\n= half-size ${formatPixels(clickRoiHalfSizePx)}.\nFull ROI size is ${formatPixels(clickRoiSizePx)}.\nLarger values inspect a wider area\nwith lower local detail.\nSmaller values focus on a tighter\nlocal neighborhood.`}
+                label={t("panel.sliders.box.label")}
+                title={t("panel.sliders.box.tooltip", {
+                  imageHeight: imageHeightLabel,
+                  ratio: settings.clickRoiHalfSizeRatio.toFixed(3),
+                  halfSize: formatPixels(clickRoiHalfSizePx),
+                  fullSize: formatPixels(clickRoiSizePx),
+                })}
                 min="0.05"
                 max="0.45"
                 step="0.005"
@@ -245,16 +274,20 @@ export function FloatingPanel() {
             </SettingsSection>
 
             <SettingsSection
-              title="history"
+              title={t("panel.sections.history")}
               toggle={
-                <IconButton active={display.showHistoryHeatmap} label="Toggle History View" onClick={() => toggleDisplay("showHistoryHeatmap")}>
+                <IconButton active={display.showHistoryHeatmap} label={t("panel.buttons.toggleHistory")} onClick={() => toggleDisplay("showHistoryHeatmap")}>
                   <IoEyeOutline />
                 </IconButton>
               }
             >
               <SliderControl
-                label="Sigma"
-                title={`Spread of each fixation deposit written\ninto the history map.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.historySigmaRatio.toFixed(3)})\n= sigma ${formatPixels(historySigmaPx)}.\nLarger values spread inhibition across\na broader area.\nSmaller values keep inhibition concentrated\nnear the fixation point.`}
+                label={t("panel.sliders.sigma.label")}
+                title={t("panel.sliders.sigma.tooltip", {
+                  imageHeight: imageHeightLabel,
+                  ratio: settings.historySigmaRatio.toFixed(3),
+                  pixels: formatPixels(historySigmaPx),
+                })}
                 min="0.01"
                 max="0.12"
                 step="0.001"
@@ -263,8 +296,8 @@ export function FloatingPanel() {
                 onChange={(value) => updateSetting("historySigmaRatio", value)}
               />
               <SliderControl
-                label="Hist"
-                title={`Strength of history-based suppression\nin candidate scoring.\nCurrent value: ${settings.historyAlpha.toFixed(1)}.\nThe score multiplier is\nexp(-alpha x historyValue).\nLarger values penalize revisits more aggressively.\nSmaller values make history matter less.`}
+                label={t("panel.sliders.hist.label")}
+                title={t("panel.sliders.hist.tooltip", { value: settings.historyAlpha.toFixed(1) })}
                 min="0"
                 max="8"
                 step="0.1"
@@ -273,8 +306,8 @@ export function FloatingPanel() {
                 onChange={(value) => updateSetting("historyAlpha", value)}
               />
               <SliderControl
-                label="Decay"
-                title={`How quickly old history fades\nwhen a new fixation is added.\nCurrent value: ${settings.historyDecay.toFixed(3)}.\nNew history is accumulated as\noldValue x decay + gaussian.\nLarger values preserve history longer.\nSmaller values erase old inhibition faster.`}
+                label={t("panel.sliders.decay.label")}
+                title={t("panel.sliders.decay.tooltip", { value: settings.historyDecay.toFixed(3) })}
                 min="0.7"
                 max="0.995"
                 step="0.005"
@@ -284,10 +317,14 @@ export function FloatingPanel() {
               />
             </SettingsSection>
 
-            <SettingsSection title="selector">
+            <SettingsSection title={t("panel.sections.selector")}>
               <SliderControl
-                label="Dist"
-                title={`Spread of the distance preference\naround the current fixation.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.distanceSigmaRatio.toFixed(3)})\n= sigma ${formatPixels(distanceSigmaPx)}.\nLarger values weaken the preference\nfor nearby candidates.\nSmaller values bias the next fixation\nmore strongly toward nearby locations.`}
+                label={t("panel.sliders.dist.label")}
+                title={t("panel.sliders.dist.tooltip", {
+                  imageHeight: imageHeightLabel,
+                  ratio: settings.distanceSigmaRatio.toFixed(3),
+                  pixels: formatPixels(distanceSigmaPx),
+                })}
                 min="0.05"
                 max="0.4"
                 step="0.005"
@@ -296,8 +333,8 @@ export function FloatingPanel() {
                 onChange={(value) => updateSetting("distanceSigmaRatio", value)}
               />
               <SliderControl
-                label="Thresh"
-                title={`Post-filter threshold applied\nto final candidate scores.\nCurrent value: ${settings.thresholdRatio.toFixed(2)}.\nCandidates with finalScore below this value\nare discarded.\nLarger values keep only stronger peaks.\nSmaller values allow weaker candidates\nto survive.`}
+                label={t("panel.sliders.thresh.label")}
+                title={t("panel.sliders.thresh.tooltip", { value: settings.thresholdRatio.toFixed(2) })}
                 min="0.05"
                 max="0.95"
                 step="0.01"
@@ -306,8 +343,14 @@ export function FloatingPanel() {
                 onChange={(value) => updateSetting("thresholdRatio", value)}
               />
               <SliderControl
-                label="Nms"
-                title={`Non-maximum suppression radius\nin model-space cells.\nCurrent estimate:\nround(image height (${imageHeightLabel})\nx ratio (${settings.nmsRadiusRatio.toFixed(3)})\nx model size 512\n/ ROI size (${roiSourceLabel}: ${roiSizeLabel}))\n= ${nmsRadiusModelPx} cells.\nLarger values merge nearby peaks\nmore aggressively.\nSmaller values keep more local maxima.`}
+                label={t("panel.sliders.nms.label")}
+                title={t("panel.sliders.nms.tooltip", {
+                  imageHeight: imageHeightLabel,
+                  ratio: settings.nmsRadiusRatio.toFixed(3),
+                  roiSource: roiSourceLabel,
+                  roiSize: roiSizeLabel,
+                  cells: nmsRadiusModelPx,
+                })}
                 min="0.001"
                 max="0.05"
                 step="0.001"
@@ -316,8 +359,8 @@ export function FloatingPanel() {
                 onChange={(value) => updateSetting("nmsRadiusRatio", value)}
               />
               <SliderControl
-                label="TopK"
-                title={`Maximum number of candidates kept\nafter GPU ranking and sorting.\nCurrent value: ${settings.topK.toFixed(0)}.\nLarger values preserve more alternatives\nfor inspection.\nSmaller values keep only the strongest\nfew candidates.`}
+                label={t("panel.sliders.topK.label")}
+                title={t("panel.sliders.topK.tooltip", { value: settings.topK.toFixed(0) })}
                 min="1"
                 max="32"
                 step="1"

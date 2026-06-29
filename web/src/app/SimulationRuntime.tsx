@@ -156,12 +156,12 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       }
       initStartedRef.current = true;
       try {
-        setLoadingState("webgpu", "Initializing WebGPU");
+        setLoadingState("webgpu");
         const engine = await createEngine(heatmapCanvas, historyCanvas, preprocessCanvas);
         engineRef.current = engine;
         setWebgpuAvailable(true);
-        setLoadingState("model", "Loading Model");
-        setLoadingState("ready", "Ready");
+        setLoadingState("model");
+        setLoadingState("ready");
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to initialize the demo.";
         setError(message);

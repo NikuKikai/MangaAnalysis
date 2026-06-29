@@ -232,6 +232,42 @@ svg {
   flex-wrap: wrap;
 }
 
+.panel-language-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding-top: 2px;
+}
+
+.panel-language-label {
+  color: rgba(240, 244, 246, 0.78);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel-language-select {
+  min-width: 108px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(8, 10, 12, 0.96);
+  color: rgba(244, 246, 248, 0.92);
+  outline: none;
+  color-scheme: dark;
+}
+
+.panel-language-select option {
+  background: #080a0c;
+  color: rgba(244, 246, 248, 0.92);
+}
+
+.panel-language-select:focus {
+  border-color: rgba(255, 195, 110, 0.42);
+}
+
 .toolbar-spacer {
   flex: 1;
 }

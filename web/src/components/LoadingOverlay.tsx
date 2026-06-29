@@ -1,11 +1,12 @@
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useSimulationStore } from "../store/simulationStore";
 
 export function LoadingOverlay() {
-  const { loadingPhase, loadingLabel, errorMessage } = useSimulationStore(
+  const { t } = useTranslation();
+  const { loadingPhase, errorMessage } = useSimulationStore(
     useShallow((state) => ({
       loadingPhase: state.loadingPhase,
-      loadingLabel: state.loadingLabel,
       errorMessage: state.errorMessage,
     })),
   );
@@ -18,7 +19,7 @@ export function LoadingOverlay() {
     <div className="loading-overlay" role="status" aria-live="polite">
       <div className="loading-panel">
         <div className="spinner" />
-        <div className="loading-label">{errorMessage ?? loadingLabel}</div>
+        <div className="loading-label">{errorMessage ?? t(`loading.${loadingPhase}`)}</div>
       </div>
     </div>
   );

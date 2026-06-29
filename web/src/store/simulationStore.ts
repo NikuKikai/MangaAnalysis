@@ -31,7 +31,6 @@ const defaultDisplay: DisplayState = {
 
 type SimulationStore = {
   loadingPhase: LoadingPhase;
-  loadingLabel: string;
   errorMessage: string | null;
   webgpuAvailable: boolean;
   image: ImageResource | null;
@@ -47,7 +46,7 @@ type SimulationStore = {
   dragStart: Point | null;
   dragCurrent: Point | null;
   isDragging: boolean;
-  setLoadingState: (phase: LoadingPhase, label: string) => void;
+  setLoadingState: (phase: LoadingPhase) => void;
   setError: (message: string) => void;
   setWebgpuAvailable: (available: boolean) => void;
   setImage: (image: ImageResource | null) => void;
@@ -69,7 +68,6 @@ type SimulationStore = {
 
 export const useSimulationStore = create<SimulationStore>((set, get) => ({
   loadingPhase: "boot",
-  loadingLabel: "Initializing",
   errorMessage: null,
   webgpuAvailable: false,
   image: null,
@@ -85,16 +83,14 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   dragStart: null,
   dragCurrent: null,
   isDragging: false,
-  setLoadingState: (phase, label) =>
+  setLoadingState: (phase) =>
     set({
       loadingPhase: phase,
-      loadingLabel: label,
       errorMessage: phase === "error" ? get().errorMessage : null,
     }),
   setError: (message) =>
     set({
       loadingPhase: "error",
-      loadingLabel: "Error",
       errorMessage: message,
     }),
   setWebgpuAvailable: (available) => set({ webgpuAvailable: available }),
