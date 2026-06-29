@@ -101,9 +101,23 @@ export function FloatingPanel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [panelExpanded, setPanelExpanded] = useState(true);
   const [infoOpen, setInfoOpen] = useState(false);
-  const { mode, display, settings, pendingNextFixation, loadImageFile, setMode, updateSetting, toggleDisplay, clearSimulation } =
+  const {
+    image,
+    currentRoi,
+    mode,
+    display,
+    settings,
+    pendingNextFixation,
+    loadImageFile,
+    setMode,
+    updateSetting,
+    toggleDisplay,
+    clearSimulation,
+  } =
     useSimulationStore(
       useShallow((state) => ({
+        image: state.image,
+        currentRoi: state.currentRoi,
         mode: state.mode,
         display: state.display,
         settings: state.settings,
@@ -121,6 +135,21 @@ export function FloatingPanel() {
     void loadImageFile(event.target.files?.[0] ?? null);
     event.target.value = "";
   };
+  const imageHeight = image?.height ?? 0;
+  const clickRoiHalfSizePx = imageHeight > 0 ? imageHeight * settings.clickRoiHalfSizeRatio : 0;
+  const clickRoiSizePx = clickRoiHalfSizePx * 2;
+  const clearRadiusPx = imageHeight > 0 ? imageHeight * settings.clearRadiusRatio : 0;
+  const historySigmaPx = imageHeight > 0 ? imageHeight * settings.historySigmaRatio : 0;
+  const distanceSigmaPx = imageHeight > 0 ? imageHeight * settings.distanceSigmaRatio : 0;
+  const referenceRoiSizePx = currentRoi?.size ?? clickRoiSizePx;
+  const nmsRadiusModelPx =
+    imageHeight > 0 && referenceRoiSizePx > 0
+      ? Math.max(1, Math.round((imageHeight * settings.nmsRadiusRatio * 512) / referenceRoiSizePx))
+      : 0;
+  const formatPixels = (value: number) => (value > 0 ? `${value.toFixed(1)} px` : "unknown");
+  const imageHeightLabel = imageHeight > 0 ? `${imageHeight} px` : "unknown";
+  const roiSizeLabel = referenceRoiSizePx > 0 ? `${referenceRoiSizePx.toFixed(1)} px` : "unknown";
+  const roiSourceLabel = currentRoi ? "current ROI size" : "default click ROI size";
 
   return (
     <>
@@ -175,7 +204,7 @@ export function FloatingPanel() {
             >
               <SliderControl
                 label="Blur"
-                title="Max Blur Strength"
+                title={`Maximum blur radius used outside\nthe clear fovea.\nCurrent value: ${settings.maxBlurStrength.toFixed(2)} px.\nLarger values make peripheral regions blurrier\nand harder to read.\nSmaller values keep more detail.`}
                 min="0"
                 max="32"
                 step="0.25"
@@ -185,7 +214,7 @@ export function FloatingPanel() {
               />
               <SliderControl
                 label="Fovea"
-                title="Clear Radius Ratio"
+                title={`Radius of the sharp center area\naround the fixation point.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.clearRadiusRatio.toFixed(3)})\n= ${formatPixels(clearRadiusPx)}.\nLarger values keep a wider area unblurred.\nSmaller values make blur start closer\nto the fixation point.`}
                 min="0.01"
                 max="0.2"
                 step="0.005"
@@ -205,7 +234,7 @@ export function FloatingPanel() {
             >
               <SliderControl
                 label="Box"
-                title="Click ROI Half Size Ratio"
+                title={`Half-size of the square ROI used in click mode\nand as the default size for Next Step.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.clickRoiHalfSizeRatio.toFixed(3)})\n= half-size ${formatPixels(clickRoiHalfSizePx)}.\nFull ROI size is ${formatPixels(clickRoiSizePx)}.\nLarger values inspect a wider area\nwith lower local detail.\nSmaller values focus on a tighter\nlocal neighborhood.`}
                 min="0.05"
                 max="0.45"
                 step="0.005"
@@ -225,7 +254,7 @@ export function FloatingPanel() {
             >
               <SliderControl
                 label="Sigma"
-                title="History Sigma Ratio"
+                title={`Spread of each fixation deposit written\ninto the history map.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.historySigmaRatio.toFixed(3)})\n= sigma ${formatPixels(historySigmaPx)}.\nLarger values spread inhibition across\na broader area.\nSmaller values keep inhibition concentrated\nnear the fixation point.`}
                 min="0.01"
                 max="0.12"
                 step="0.001"
@@ -235,7 +264,7 @@ export function FloatingPanel() {
               />
               <SliderControl
                 label="Hist"
-                title="History Inhibition Strength"
+                title={`Strength of history-based suppression\nin candidate scoring.\nCurrent value: ${settings.historyAlpha.toFixed(1)}.\nThe score multiplier is\nexp(-alpha x historyValue).\nLarger values penalize revisits more aggressively.\nSmaller values make history matter less.`}
                 min="0"
                 max="8"
                 step="0.1"
@@ -245,7 +274,7 @@ export function FloatingPanel() {
               />
               <SliderControl
                 label="Decay"
-                title="History Decay"
+                title={`How quickly old history fades\nwhen a new fixation is added.\nCurrent value: ${settings.historyDecay.toFixed(3)}.\nNew history is accumulated as\noldValue x decay + gaussian.\nLarger values preserve history longer.\nSmaller values erase old inhibition faster.`}
                 min="0.7"
                 max="0.995"
                 step="0.005"
@@ -258,7 +287,7 @@ export function FloatingPanel() {
             <SettingsSection title="selector">
               <SliderControl
                 label="Dist"
-                title="Distance Sigma Ratio"
+                title={`Spread of the distance preference\naround the current fixation.\nFormula: image height (${imageHeightLabel})\nx ratio (${settings.distanceSigmaRatio.toFixed(3)})\n= sigma ${formatPixels(distanceSigmaPx)}.\nLarger values weaken the preference\nfor nearby candidates.\nSmaller values bias the next fixation\nmore strongly toward nearby locations.`}
                 min="0.05"
                 max="0.4"
                 step="0.005"
@@ -268,7 +297,7 @@ export function FloatingPanel() {
               />
               <SliderControl
                 label="Thresh"
-                title="Threshold Ratio"
+                title={`Post-filter threshold applied\nto final candidate scores.\nCurrent value: ${settings.thresholdRatio.toFixed(2)}.\nCandidates with finalScore below this value\nare discarded.\nLarger values keep only stronger peaks.\nSmaller values allow weaker candidates\nto survive.`}
                 min="0.05"
                 max="0.95"
                 step="0.01"
@@ -278,7 +307,7 @@ export function FloatingPanel() {
               />
               <SliderControl
                 label="Nms"
-                title="NMS Radius Ratio"
+                title={`Non-maximum suppression radius\nin model-space cells.\nCurrent estimate:\nround(image height (${imageHeightLabel})\nx ratio (${settings.nmsRadiusRatio.toFixed(3)})\nx model size 512\n/ ROI size (${roiSourceLabel}: ${roiSizeLabel}))\n= ${nmsRadiusModelPx} cells.\nLarger values merge nearby peaks\nmore aggressively.\nSmaller values keep more local maxima.`}
                 min="0.001"
                 max="0.05"
                 step="0.001"
@@ -288,7 +317,7 @@ export function FloatingPanel() {
               />
               <SliderControl
                 label="TopK"
-                title="Top Candidate Count"
+                title={`Maximum number of candidates kept\nafter GPU ranking and sorting.\nCurrent value: ${settings.topK.toFixed(0)}.\nLarger values preserve more alternatives\nfor inspection.\nSmaller values keep only the strongest\nfew candidates.`}
                 min="1"
                 max="32"
                 step="1"
