@@ -78,6 +78,9 @@ svg {
 
 .overlay-history-shadow,
 .overlay-history-line,
+.overlay-best-candidate-arrow-shadow,
+.overlay-best-candidate-arrow,
+.overlay-best-candidate-arrowhead,
 .overlay-history-dot-shadow,
 .overlay-history-dot,
 .overlay-candidate-shadow,
@@ -118,6 +121,27 @@ svg {
   fill: rgba(255, 245, 212, 0.94);
   stroke: rgba(20, 22, 24, 0.95);
   stroke-width: 2;
+}
+
+.overlay-best-candidate-arrow-shadow {
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 5.5;
+  stroke-linecap: round;
+  stroke-dasharray: 8 8;
+}
+
+.overlay-best-candidate-arrow {
+  stroke: rgba(255, 214, 138, 0.96);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-dasharray: 8 8;
+}
+
+.overlay-best-candidate-arrowhead {
+  fill: rgba(255, 214, 138, 0.96);
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
 }
 
 .overlay-candidate-shadow {

@@ -77,6 +77,34 @@ export function OverlaySvg(props: OverlaySvgProps) {
     return pagePointToScreen(pendingNextFixation, imageRect, imageWidth, imageHeight);
   }, [imageHeight, imageRect, imageWidth, pendingNextFixation]);
 
+  const bestCandidateArrow = useMemo(() => {
+    if (!currentFixationPoint || !pendingFixationPoint) {
+      return null;
+    }
+    const dx = pendingFixationPoint.x - currentFixationPoint.x;
+    const dy = pendingFixationPoint.y - currentFixationPoint.y;
+    const length = Math.hypot(dx, dy);
+    if (length < 1) {
+      return null;
+    }
+
+    const ux = dx / length;
+    const uy = dy / length;
+    const startOffset = 10;
+    const endOffset = 13;
+    const startX = currentFixationPoint.x + ux * startOffset;
+    const startY = currentFixationPoint.y + uy * startOffset;
+    const endX = pendingFixationPoint.x - ux * endOffset;
+    const endY = pendingFixationPoint.y - uy * endOffset;
+
+    return {
+      x1: startX,
+      y1: startY,
+      x2: endX,
+      y2: endY,
+    };
+  }, [currentFixationPoint, pendingFixationPoint]);
+
   return (
     <svg
       className="stage-svg overlay-layer"
@@ -85,10 +113,44 @@ export function OverlaySvg(props: OverlaySvgProps) {
       height={viewportHeight}
       aria-hidden="true"
     >
+      <defs>
+        <marker
+          id="best-candidate-arrowhead"
+          markerWidth="20"
+          markerHeight="20"
+          refX="14"
+          refY="8"
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <path className="overlay-best-candidate-arrowhead" d="M0 0L16 8L0 16Z" />
+        </marker>
+      </defs>
+
       {trajectoryPath ? (
         <>
           <path className="overlay-history-shadow" d={trajectoryPath} />
           <path className="overlay-history-line" d={trajectoryPath} />
+        </>
+      ) : null}
+
+      {bestCandidateArrow ? (
+        <>
+          <line
+            className="overlay-best-candidate-arrow-shadow"
+            x1={bestCandidateArrow.x1}
+            y1={bestCandidateArrow.y1}
+            x2={bestCandidateArrow.x2}
+            y2={bestCandidateArrow.y2}
+          />
+          <line
+            className="overlay-best-candidate-arrow"
+            x1={bestCandidateArrow.x1}
+            y1={bestCandidateArrow.y1}
+            x2={bestCandidateArrow.x2}
+            y2={bestCandidateArrow.y2}
+            markerEnd="url(#best-candidate-arrowhead)"
+          />
         </>
       ) : null}
 
