@@ -237,8 +237,41 @@ svg {
 .mode-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   flex-wrap: nowrap;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.mode-group > .icon-button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.mode-group > .icon-button + .icon-button {
+  position: relative;
+}
+
+.mode-group > .icon-button + .icon-button::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: opacity 140ms ease;
+}
+
+.mode-group > .icon-button.is-active + .icon-button::before,
+.mode-group > .icon-button + .icon-button.is-active::before {
+  opacity: 0;
 }
 
 .settings-sections {
@@ -397,6 +430,7 @@ svg {
   color: #ffd49b;
   border-color: rgba(255, 195, 110, 0.42);
   background: rgba(255, 179, 88, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 195, 110, 0.28);
 }
 
 .dialog-backdrop {
