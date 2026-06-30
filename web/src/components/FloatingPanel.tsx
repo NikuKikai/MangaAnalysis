@@ -140,12 +140,12 @@ export function FloatingPanel() {
     event.target.value = "";
   };
   const imageHeight = image?.height ?? 0;
-  const clickRoiHalfSizePx = imageHeight > 0 ? imageHeight * settings.clickRoiHalfSizeRatio : 0;
-  const clickRoiSizePx = clickRoiHalfSizePx * 2;
+  const defaultRoiHalfSizePx = imageHeight > 0 ? imageHeight * settings.defaultRoiHalfSizeRatio : 0;
+  const defaultRoiSizePx = defaultRoiHalfSizePx * 2;
   const clearRadiusPx = imageHeight > 0 ? imageHeight * settings.clearRadiusRatio : 0;
   const historySigmaPx = imageHeight > 0 ? imageHeight * settings.historySigmaRatio : 0;
   const distanceSigmaPx = imageHeight > 0 ? imageHeight * settings.distanceSigmaRatio : 0;
-  const referenceRoiSizePx = currentRoi?.size ?? clickRoiSizePx;
+  const referenceRoiSizePx = currentRoi?.size ?? defaultRoiSizePx;
   const nmsRadiusModelPx =
     imageHeight > 0 && referenceRoiSizePx > 0
       ? Math.max(1, Math.round((imageHeight * settings.nmsRadiusRatio * 512) / referenceRoiSizePx))
@@ -153,7 +153,7 @@ export function FloatingPanel() {
   const formatPixels = (value: number) => (value > 0 ? `${value.toFixed(1)} px` : t("panel.unknown"));
   const imageHeightLabel = imageHeight > 0 ? `${imageHeight} px` : t("panel.unknown");
   const roiSizeLabel = referenceRoiSizePx > 0 ? `${referenceRoiSizePx.toFixed(1)} px` : t("panel.unknown");
-  const roiSourceLabel = currentRoi ? t("panel.roiSource.current") : t("panel.roiSource.defaultClick");
+  const roiSourceLabel = currentRoi ? t("panel.roiSource.current") : t("panel.roiSource.default");
   const handleLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
     void i18n.changeLanguage(event.target.value as AppLanguage);
   };
@@ -260,16 +260,16 @@ export function FloatingPanel() {
                 label={t("panel.sliders.box.label")}
                 title={t("panel.sliders.box.tooltip", {
                   imageHeight: imageHeightLabel,
-                  ratio: settings.clickRoiHalfSizeRatio.toFixed(3),
-                  halfSize: formatPixels(clickRoiHalfSizePx),
-                  fullSize: formatPixels(clickRoiSizePx),
+                  ratio: settings.defaultRoiHalfSizeRatio.toFixed(3),
+                  halfSize: formatPixels(defaultRoiHalfSizePx),
+                  fullSize: formatPixels(defaultRoiSizePx),
                 })}
                 min="0.05"
                 max="0.45"
                 step="0.005"
-                value={settings.clickRoiHalfSizeRatio}
-                displayValue={settings.clickRoiHalfSizeRatio.toFixed(3)}
-                onChange={(value) => updateSetting("clickRoiHalfSizeRatio", value)}
+                value={settings.defaultRoiHalfSizeRatio}
+                displayValue={settings.defaultRoiHalfSizeRatio.toFixed(3)}
+                onChange={(value) => updateSetting("defaultRoiHalfSizeRatio", value)}
               />
             </SettingsSection>
 

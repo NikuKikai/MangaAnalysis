@@ -107,7 +107,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const settings = useSimulationStore((state) => state.settings);
   const currentRoi = useSimulationStore((state) => state.currentRoi);
   const currentFixation = useSimulationStore((state) => state.currentFixation);
-  const activeRoiHalfSizePx = useSimulationStore((state) => state.activeRoiHalfSizePx);
   const pendingNextFixation = useSimulationStore((state) => state.pendingNextFixation);
   const trajectory = useSimulationStore((state) => state.trajectory);
   const dragStart = useSimulationStore((state) => state.dragStart);
@@ -336,7 +335,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       historyAlpha: settings.historyAlpha,
       distanceSigma,
     });
-    console.log(scoredCandidates.map(c => c.finalScore));
     return {
       roi,
       candidates: filterCandidatesByThreshold(scoredCandidates),
@@ -391,7 +389,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!image) {
       return;
     }
-    const halfSize = image.height * settings.clickRoiHalfSizeRatio;
+    const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(point, halfSize);
     await runStep(roi, point, [point]);
   };
@@ -407,7 +405,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!image || !pendingNextFixation) {
       return;
     }
-    const halfSize = activeRoiHalfSizePx ?? image.height * settings.clickRoiHalfSizeRatio;
+    const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(pendingNextFixation, halfSize);
     await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation]);
   };

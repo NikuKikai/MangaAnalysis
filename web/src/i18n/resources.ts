@@ -55,7 +55,7 @@ export const resources = {
           box: {
             label: "Box",
             tooltip:
-              "Half-size of the square ROI used in click mode\nand as the default size for Next Step.\nFormula: image height ({{imageHeight}})\nx ratio ({{ratio}})\n= half-size {{halfSize}}.\nFull ROI size is {{fullSize}}.\nLarger values inspect a wider area\nwith lower local detail.\nSmaller values focus on a tighter\nlocal neighborhood.",
+              "Half-size of the default square ROI used to start each step.\nClick mode uses this size directly.\nBox mode only chooses the initial ROI for the current step.\nFormula: image height ({{imageHeight}})\nx ratio ({{ratio}})\n= half-size {{halfSize}}.\nFull ROI size is {{fullSize}}.\nLarger values inspect a wider area\nwith lower local detail.\nSmaller values focus on a tighter\nlocal neighborhood.",
           },
           sigma: {
             label: "Sigma",
@@ -95,7 +95,7 @@ export const resources = {
         },
         roiSource: {
           current: "current ROI size",
-          defaultClick: "default click ROI size",
+          default: "default ROI size",
         },
         unknown: "unknown",
       },
@@ -157,7 +157,7 @@ export const resources = {
           box: {
             label: "Box",
             tooltip:
-              "クリックモードで使う正方形 ROI の半サイズです。\nNext Step の既定サイズにも使われます。\n計算式: 画像高さ ({{imageHeight}})\nx ratio ({{ratio}})\n= 半サイズ {{halfSize}}。\nROI 全体サイズは {{fullSize}} です。\n大きいほど広い範囲を見ますが局所性は下がり、\n小さいほど狭い領域に集中します。",
+              "各ステップの開始時に使う既定の正方形 ROI の半サイズです。\nクリックモードではこのサイズを直接使います。\nボックスモードはそのステップだけの初期 ROI を選ぶためのものです。\n計算式: 画像高さ ({{imageHeight}})\nx ratio ({{ratio}})\n= 半サイズ {{halfSize}}。\nROI 全体サイズは {{fullSize}} です。\n大きいほど広い範囲を見ますが局所性は下がり、\n小さいほど狭い領域に集中します。",
           },
           sigma: {
             label: "Sigma",
@@ -197,7 +197,7 @@ export const resources = {
         },
         roiSource: {
           current: "現在の ROI サイズ",
-          defaultClick: "既定のクリック ROI サイズ",
+          default: "既定の ROI サイズ",
         },
         unknown: "不明",
       },

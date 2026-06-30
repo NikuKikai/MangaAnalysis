@@ -13,7 +13,7 @@ import type {
 const defaultSettings: SimulationSettings = {
   maxBlurStrength: 7,
   clearRadiusRatio: 0.06,
-  clickRoiHalfSizeRatio: 0.25,
+  defaultRoiHalfSizeRatio: 0.25,
   historySigmaRatio: 0.047,
   historyDecay: 0.94,
   historyAlpha: 3,
@@ -30,22 +30,32 @@ const defaultDisplay: DisplayState = {
 };
 
 type SimulationStore = {
+  // Lifecycle and runtime availability.
   loadingPhase: LoadingPhase;
   errorMessage: string | null;
   webgpuAvailable: boolean;
+
+  // Loaded page resource and initial ROI selection mode.
   image: ImageResource | null;
   mode: MouseMode;
+
+  // UI visibility flags and tunable simulation parameters.
   display: DisplayState;
   settings: SimulationSettings;
+
+  // Latest committed step result used for rendering and stepping forward.
   currentFixation: Point | null;
   currentRoi: RoiRect | null;
-  activeRoiHalfSizePx: number | null;
   pendingNextFixation: Point | null;
   candidates: Candidate[];
   trajectory: Point[];
+
+  // Transient box-drag interaction state.
   dragStart: Point | null;
   dragCurrent: Point | null;
   isDragging: boolean;
+
+  // Store actions.
   setLoadingState: (phase: LoadingPhase) => void;
   setError: (message: string) => void;
   setWebgpuAvailable: (available: boolean) => void;
@@ -67,22 +77,32 @@ type SimulationStore = {
 };
 
 export const useSimulationStore = create<SimulationStore>((set, get) => ({
+  // Lifecycle and runtime availability.
   loadingPhase: "boot",
   errorMessage: null,
   webgpuAvailable: false,
+
+  // Loaded page resource and initial ROI selection mode.
   image: null,
   mode: "click",
+
+  // UI visibility flags and tunable simulation parameters.
   display: defaultDisplay,
   settings: defaultSettings,
+
+  // Latest committed step result used for rendering and stepping forward.
   currentFixation: null,
   currentRoi: null,
-  activeRoiHalfSizePx: null,
   pendingNextFixation: null,
   candidates: [],
   trajectory: [],
+
+  // Transient box-drag interaction state.
   dragStart: null,
   dragCurrent: null,
   isDragging: false,
+
+  // Store actions.
   setLoadingState: (phase) =>
     set({
       loadingPhase: phase,
@@ -99,7 +119,6 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       image,
       currentFixation: null,
       currentRoi: null,
-      activeRoiHalfSizePx: null,
       pendingNextFixation: null,
       candidates: [],
       trajectory: [],
@@ -149,7 +168,6 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     set({
       currentFixation: fixation,
       currentRoi: roi,
-      activeRoiHalfSizePx: roi.size * 0.5,
       pendingNextFixation,
       candidates,
       trajectory: committedTrajectory,
@@ -169,7 +187,6 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
     set({
       currentFixation: null,
       currentRoi: null,
-      activeRoiHalfSizePx: null,
       pendingNextFixation: null,
       candidates: [],
       trajectory: [],

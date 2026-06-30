@@ -20,7 +20,7 @@ export type DisplayState = {
 export type SimulationSettings = {
   maxBlurStrength: number;
   clearRadiusRatio: number;
-  clickRoiHalfSizeRatio: number;
+  defaultRoiHalfSizeRatio: number;
   historySigmaRatio: number;
   historyDecay: number;
   historyAlpha: number;
