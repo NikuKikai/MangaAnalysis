@@ -313,12 +313,12 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const filterCandidatesByThreshold = (candidates: Candidate[]) =>
     candidates.filter((candidate) => candidate.finalScore >= settings.thresholdRatio);
 
-  const runStepOnce = async (engine: Engine, roi: RoiRect, fixation: Point) => {
-    const input = await engine.preprocessor.run(roi, fixation, image.height, settings);
+  const runStepOnce = async (engine: Engine, imageResource: ImageResource, roi: RoiRect, fixation: Point) => {
+    const input = await engine.preprocessor.run(roi, fixation, imageResource.height, settings);
     engine.preprocessRenderer.updatePreview(input, modelSize());
     const heatmap = await engine.session.predict(input);
-    const nmsRadius = Math.max(1, Math.round((image.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
-    const distanceSigma = Math.max(1, image.height * settings.distanceSigmaRatio);
+    const nmsRadius = Math.max(1, Math.round((imageResource.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
+    const distanceSigma = Math.max(1, imageResource.height * settings.distanceSigmaRatio);
     engine.heatmapRenderer.updateHeatmap(heatmap, modelSize());
     const scoredCandidates = await engine.candidateSelector.select({
       heatmapBuffer: engine.heatmapRenderer.getBuffer(),
@@ -327,8 +327,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       nmsRadius,
       topK: settings.topK,
       roi,
-      imageWidth: image.width,
-      imageHeight: image.height,
+      imageWidth: imageResource.width,
+      imageHeight: imageResource.height,
       currentFixation: fixation,
       historyMapWidth: engine.historyMapWidth,
       historyMapHeight: engine.historyMapHeight,
@@ -362,9 +362,9 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       renderHistoryOverlay(engine, imageRect);
     }
 
-    let stepResult = await runStepOnce(engine, initialRoi, fixation);
+    let stepResult = await runStepOnce(engine, image, initialRoi, fixation);
     if (stepResult.candidates.length === 0) {
-      stepResult = await runStepOnce(engine, createFullPageSquareRoi(image.width, image.height), fixation);
+      stepResult = await runStepOnce(engine, image, createFullPageSquareRoi(image.width, image.height), fixation);
     }
 
     const { roi, candidates: scoredCandidates } = stepResult;
