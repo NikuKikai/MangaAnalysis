@@ -11,9 +11,11 @@ def add_fixation_to_history(
     history_map: np.ndarray,
     fixation: tuple[float, float],
     sigma: float,
+    decay: float = 1.0,
     amplitude: float = 1.0,
 ) -> None:
     height, width = history_map.shape
+    history_map *= min(0.999, max(float(decay), 0.0))
     center_x = float(fixation[0])
     center_y = float(fixation[1])
     radius = max(1, int(np.ceil(3.0 * sigma)))

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from PIL import Image
+
 from reading_simulation.saliency_inference import SaliencyInference
 from reading_simulation.simulator import ReadingSimulator, SimulationConfig
 from reading_simulation.visualize import save_visualization, show_visualization
@@ -22,22 +24,24 @@ def main() -> None:
     simulator = ReadingSimulator(
         inference,
         SimulationConfig(
-            roi_size_ratio=0.65,
-            clear_radius_ratio=0.1,
+            default_roi_half_size_ratio=0.25,
+            clear_radius_ratio=0.06,
             blur_level_count=8,
-            max_blur_strength=16.0,
+            max_blur_strength=7.0,
             history_sigma_ratio=0.047,
-            history_alpha=2.0,
+            history_decay=0.94,
+            history_alpha=3.0,
             distance_sigma_ratio=0.183,
-            start_region_radius_ratio=0.3,
-            start_corner_weight=0.35,
-            threshold_ratio=0.55,
+            threshold_score=0.15,
             nms_radius_ratio=0.013,
             top_k=8,
             steps=12,
         ),
     )
-    result = simulator.simulate(str(PAGE_IMAGE_PATH))
+    with Image.open(PAGE_IMAGE_PATH) as page_image:
+        page_width, page_height = page_image.size
+    initial_fixation = (page_width * 0.9, page_height * 0.1)
+    result = simulator.simulate(str(PAGE_IMAGE_PATH), initial_fixation=initial_fixation)
     save_visualization(result, str(OUTPUT_IMAGE_PATH))
     OUTPUT_JSON_PATH.write_text(__import__("json").dumps(result.to_json(), indent=2), encoding="utf-8")
     print(f"Saved image to: {OUTPUT_IMAGE_PATH}")

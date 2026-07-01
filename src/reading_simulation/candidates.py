@@ -34,20 +34,19 @@ def _max_pool_2d(array: np.ndarray, radius: int) -> np.ndarray:
 
 
 def extract_local_maxima(
-    saliency_map: np.ndarray,
-    threshold_ratio: float,
+    score_map: np.ndarray,
     nms_radius: int,
     top_k: int,
+    min_score: float = 0.0,
 ) -> list[tuple[int, int, float]]:
-    if saliency_map.size == 0:
+    if score_map.size == 0:
         return []
 
-    peak_threshold = float(saliency_map.max()) * threshold_ratio
-    pooled = _max_pool_2d(saliency_map, nms_radius)
-    mask = (saliency_map >= peak_threshold) & (saliency_map >= pooled - 1e-8)
+    pooled = _max_pool_2d(score_map, nms_radius)
+    mask = (score_map >= float(min_score)) & (score_map >= pooled - 1e-8)
     points = np.argwhere(mask)
     ranked = sorted(
-        ((int(y), int(x), float(saliency_map[y, x])) for y, x in points),
+        ((int(y), int(x), float(score_map[y, x])) for y, x in points),
         key=lambda item: item[2],
         reverse=True,
     )
