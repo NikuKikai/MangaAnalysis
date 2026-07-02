@@ -1,3 +1,5 @@
-from .simulator import ReadingSimulator, SimulationConfig, SimulationResult
+from .config import SimulationConfig
+from .simulator import ReadingSimulator
+from .types import FluidityAnalysis, SimulationResult, StepState
 
-__all__ = ["ReadingSimulator", "SimulationConfig", "SimulationResult"]
+__all__ = ["FluidityAnalysis", "ReadingSimulator", "SimulationConfig", "SimulationResult", "StepState"]

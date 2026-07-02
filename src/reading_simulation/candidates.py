@@ -7,6 +7,8 @@ import numpy as np
 
 @dataclass(slots=True)
 class CandidatePoint:
+    """Scored candidate fixation point expressed in both ROI and page coordinates."""
+
     roi_x: int
     roi_y: int
     page_x: float
@@ -19,6 +21,7 @@ class CandidatePoint:
 
 
 def _max_pool_2d(array: np.ndarray, radius: int) -> np.ndarray:
+    """Compute a slow but simple local max-pooling map for 2D arrays."""
     if radius <= 0:
         return array
     height, width = array.shape
@@ -39,6 +42,7 @@ def extract_local_maxima(
     top_k: int,
     min_score: float = 0.0,
 ) -> list[tuple[int, int, float]]:
+    """Return the top local maxima after thresholding and non-maximum suppression."""
     if score_map.size == 0:
         return []
 

@@ -1,29 +1,53 @@
 from __future__ import annotations
 
+import argparse
+import json
+import site
 from pathlib import Path
 
 from PIL import Image
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+site.addsitedir(str(REPO_ROOT / ".venv" / "Lib" / "site-packages"))
+
+from reading_simulation import ReadingSimulator, SimulationConfig
 from reading_simulation.saliency_inference import SaliencyInference
-from reading_simulation.simulator import ReadingSimulator, SimulationConfig
 from reading_simulation.visualize import save_visualization, show_visualization
 
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-PAGE_IMAGE_PATH = REPO_ROOT / "samples" / "Q_005_006.png"
+# Default sample page used by the reading-simulation demo.
 PAGE_IMAGE_PATH = REPO_ROOT / "samples" / "TARU_014.png"
 
-CONFIG_PATH = REPO_ROOT / "configs" / "saliency" / "stage1_salicon_gpu_pretrained.toml"
-CHECKPOINT_PATH = REPO_ROOT / "runs" / "saliency" / "stage1_salicon_gpu_pretrained" / "checkpoints" / "epoch_004.pt"
-OUTPUT_IMAGE_PATH = REPO_ROOT / "samples" / "reading_simulation_result.png"
-OUTPUT_JSON_PATH = REPO_ROOT / "samples" / "reading_simulation_result.json"
+CONFIG_PATH = REPO_ROOT / "configs" / "saliency" / "stage1_salicon_pretrained_512_v2w075.toml"
+CHECKPOINT_PATH = REPO_ROOT / "runs" / "saliency" / "stage1_salicon_pretrained_512_v2w075" / "checkpoints" / "epoch_004.pt"
+DEFAULT_OUTPUT_IMAGE_PATH = REPO_ROOT / "samples" / "reading_simulation_result.png"
+DEFAULT_OUTPUT_JSON_PATH = REPO_ROOT / "samples" / "reading_simulation_result.json"
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the reading-simulation demo."""
+    parser = argparse.ArgumentParser(description="Run manga reading simulation with selectable strategies.")
+    parser.add_argument("--image", type=Path, default=PAGE_IMAGE_PATH, help="Input manga page path.")
+    parser.add_argument(
+        "--strategy",
+        choices=["saliency_only", "panel_guided"],
+        default="panel_guided",
+        help="Reading-simulation strategy to run.",
+    )
+    parser.add_argument("--steps", type=int, default=12, help="Maximum number of transition steps.")
+    parser.add_argument("--output-image", type=Path, default=DEFAULT_OUTPUT_IMAGE_PATH, help="Output visualization path.")
+    parser.add_argument("--output-json", type=Path, default=DEFAULT_OUTPUT_JSON_PATH, help="Output JSON path.")
+    parser.add_argument("--show", action="store_true", help="Show the visualization in an OpenCV window when available.")
+    return parser.parse_args()
 
 
 def main() -> None:
+    """Execute the selected reading-simulation strategy on one page."""
+    args = parse_args()
     inference = SaliencyInference(str(CONFIG_PATH), str(CHECKPOINT_PATH))
     simulator = ReadingSimulator(
         inference,
         SimulationConfig(
+            strategy=args.strategy,
             default_roi_half_size_ratio=0.25,
             clear_radius_ratio=0.06,
             blur_level_count=8,
@@ -35,18 +59,26 @@ def main() -> None:
             threshold_score=0.15,
             nms_radius_ratio=0.013,
             top_k=8,
-            steps=12,
+            steps=args.steps,
         ),
     )
-    with Image.open(PAGE_IMAGE_PATH) as page_image:
+    with Image.open(args.image) as page_image:
         page_width, page_height = page_image.size
     initial_fixation = (page_width * 0.9, page_height * 0.1)
-    result = simulator.simulate(str(PAGE_IMAGE_PATH), initial_fixation=initial_fixation)
-    save_visualization(result, str(OUTPUT_IMAGE_PATH))
-    OUTPUT_JSON_PATH.write_text(__import__("json").dumps(result.to_json(), indent=2), encoding="utf-8")
-    print(f"Saved image to: {OUTPUT_IMAGE_PATH}")
-    print(f"Saved json to: {OUTPUT_JSON_PATH}")
-    show_visualization(result)
+    result = simulator.simulate(str(args.image), initial_fixation=initial_fixation)
+
+    # Persist both the structured trace and the default visualization for inspection.
+    save_visualization(result, str(args.output_image))
+    args.output_json.write_text(json.dumps(result.to_json(), indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Strategy: {result.strategy}")
+    print(f"Fixations: {len(result.fixations)}")
+    if result.analysis is not None:
+        print(f"Reading fluidity mean score: {result.analysis.mean_score:.4f}")
+        print(f"Reading fluidity max score: {result.analysis.max_score:.4f}")
+    print(f"Saved image to: {args.output_image}")
+    print(f"Saved json to: {args.output_json}")
+    if args.show:
+        show_visualization(result)
 
 
 if __name__ == "__main__":

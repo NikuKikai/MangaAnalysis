@@ -7,12 +7,13 @@ import torch
 from PIL import Image
 
 from saliency.config import load_config
+from saliency.model import create_model_from_config
 from saliency.metrics import sigmoid_map
-from saliency.model import SaliencyUNet
 from saliency.datasets.common import IMAGENET_MEAN, IMAGENET_STD, resize_with_padding
 
 
 def resolve_device(device_name: str) -> torch.device:
+    """Resolve the configured device name into an actual torch device."""
     if device_name != "auto":
         return torch.device(device_name)
     if torch.cuda.is_available():
@@ -21,15 +22,17 @@ def resolve_device(device_name: str) -> torch.device:
 
 
 class SaliencyInference:
+    """Load a trained saliency model and run page-level inference on PIL images."""
+
     def __init__(self, config_path: str, checkpoint_path: str) -> None:
+        """Create a saliency inference wrapper from one config file and one checkpoint."""
         self.config_path = str(Path(config_path).resolve())
         self.checkpoint_path = str(Path(checkpoint_path).resolve())
         self.config = load_config(self.config_path)
         self.device = resolve_device(self.config.training.device)
-        self.model = SaliencyUNet(
-            encoder_pretrained=False,
-            base_channels=self.config.model.base_channels,
-        )
+
+        # Build the exact architecture described by the training config so checkpoints remain compatible.
+        self.model = create_model_from_config(self.config.model)
         checkpoint = torch.load(self.checkpoint_path, map_location="cpu")
         self.model.load_state_dict(checkpoint["model"])
         self.model.to(self.device)
@@ -37,6 +40,7 @@ class SaliencyInference:
         self.input_size = self.config.dataset.input_size
 
     def _image_to_tensor(self, image: Image.Image) -> torch.Tensor:
+        """Convert a PIL image into the normalized model input tensor."""
         resized = resize_with_padding(image.convert("RGB"), self.input_size, Image.Resampling.BILINEAR, (0, 0, 0))
         array = np.asarray(resized, dtype=np.float32) / 255.0
         tensor = torch.from_numpy(array).permute(2, 0, 1)
@@ -44,6 +48,7 @@ class SaliencyInference:
         return tensor.unsqueeze(0)
 
     def predict(self, image: Image.Image) -> tuple[np.ndarray, Image.Image]:
+        """Predict a normalized saliency map and its grayscale preview image."""
         original_size = image.size
         input_tensor = self._image_to_tensor(image).to(self.device)
         with torch.no_grad():
