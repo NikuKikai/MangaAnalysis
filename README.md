@@ -40,3 +40,25 @@ uv run python src/run_reading_simulation_demo.py
 - Deploy: need to remove ORT WASM file under `/dist/assets` manually.
 
 
+## Manga Panel Order (python)
+
+`/src/panel_order/`
+
+- Traditional CV2-based pipeline, no external model required.
+- Detects rectangular manga panels from page borders.
+- Builds a recursive XY-cut layout tree.
+- Derives Japanese manga reading order:
+  - rows are read top to bottom
+  - panels inside a row are read right to left
+- Best suited to pages with explicit panel borders and visible gutters.
+
+- Demo:
+```bash
+python src/run_panel_order_demo.py
+```
+
+- Output:
+  - `samples/panel_order_result.json`
+  - `samples/panel_order_result.png`
+
+
