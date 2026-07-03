@@ -5,6 +5,7 @@ import { HistoryRenderer } from "../core/gpu/historyRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { PreprocessRenderer } from "../core/gpu/preprocessRenderer";
 import { SaliencySession } from "../core/onnx/saliencySession";
+import { analyzePanels } from "../core/panel_order/detector";
 import { drawBaseImage, resizeAndClear2dCanvas } from "../core/utils/canvas2d";
 import {
   createCenteredSquareRoi,
@@ -115,6 +116,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const mode = useSimulationStore((state) => state.mode);
   const setLoadingState = useSimulationStore((state) => state.setLoadingState);
   const setError = useSimulationStore((state) => state.setError);
+  const setPanelBoxes = useSimulationStore((state) => state.setPanelBoxes);
   const setWebgpuAvailable = useSimulationStore((state) => state.setWebgpuAvailable);
   const applyStepOutcome = useSimulationStore((state) => state.applyStepOutcome);
 
@@ -179,6 +181,44 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       renderHistoryOverlay(engineRef.current, imageRect);
     }
   }, [image, imageRect, display.showHistoryHeatmap]);
+
+  // Detect panel boxes whenever a new page image is loaded so the overlay can visualize them immediately.
+  useEffect(() => {
+    if (!image) {
+      setPanelBoxes([]);
+      return;
+    }
+
+    let cancelled = false;
+    const runDetection = async () => {
+      try {
+        const analysis = await analyzePanels(image.bitmap);
+        if (!cancelled) {
+          const readingIndexByPanelId = new Map<number, number>();
+          analysis.readingOrder.forEach((panelId, index) => {
+            // Convert the reading order array into 1-based labels for the overlay.
+            readingIndexByPanelId.set(panelId, index + 1);
+          });
+          setPanelBoxes(
+            analysis.panels.map((panel) => ({
+              ...panel,
+              readingIndex: readingIndexByPanelId.get(panel.panelId) ?? null,
+            })),
+          );
+        }
+      } catch (error) {
+        console.error("Panel detection failed.", error);
+        if (!cancelled) {
+          setPanelBoxes([]);
+        }
+      }
+    };
+
+    void runDetection();
+    return () => {
+      cancelled = true;
+    };
+  }, [image, setPanelBoxes]);
 
   // Reset GPU-side simulation buffers when the logical simulation state is cleared.
   useEffect(() => {

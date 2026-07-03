@@ -5,6 +5,7 @@ import type {
   ImageResource,
   LoadingPhase,
   MouseMode,
+  PanelBox,
   Point,
   RoiRect,
   SimulationSettings,
@@ -27,6 +28,7 @@ const defaultDisplay: DisplayState = {
   showPreprocess: true,
   showHeatmap: true,
   showHistoryHeatmap: false,
+  showPanelBoxes: true,
 };
 
 type SimulationStore = {
@@ -48,6 +50,7 @@ type SimulationStore = {
   currentRoi: RoiRect | null;
   pendingNextFixation: Point | null;
   candidates: Candidate[];
+  panelBoxes: PanelBox[];
   trajectory: Point[];
 
   // Transient box-drag interaction state.
@@ -65,6 +68,7 @@ type SimulationStore = {
   updateSetting: <K extends keyof SimulationSettings>(key: K, value: SimulationSettings[K]) => void;
   toggleDisplay: (key: keyof DisplayState) => void;
   setDragState: (start: Point | null, current: Point | null, dragging: boolean) => void;
+  setPanelBoxes: (panelBoxes: PanelBox[]) => void;
   applyStepOutcome: (params: {
     roi: RoiRect;
     fixation: Point;
@@ -95,6 +99,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   currentRoi: null,
   pendingNextFixation: null,
   candidates: [],
+  panelBoxes: [],
   trajectory: [],
 
   // Transient box-drag interaction state.
@@ -121,6 +126,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       currentRoi: null,
       pendingNextFixation: null,
       candidates: [],
+      panelBoxes: [],
       trajectory: [],
     }),
   loadImageFile: async (file) => {
@@ -158,6 +164,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       dragCurrent: current,
       isDragging: dragging,
     }),
+  setPanelBoxes: (panelBoxes) => set({ panelBoxes }),
   applyStepOutcome: ({
     roi,
     fixation,

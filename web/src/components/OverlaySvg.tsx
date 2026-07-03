@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useSimulationStore } from "../store/simulationStore";
-import { pagePointToScreen, roiToScreenRect, type ImageRect } from "../core/utils/roi";
+import { pagePointToScreen, pageRectToScreenRect, roiToScreenRect, type ImageRect } from "../core/utils/roi";
 
 type OverlaySvgProps = {
   viewportWidth: number;
@@ -14,13 +14,15 @@ type OverlaySvgProps = {
 
 export function OverlaySvg(props: OverlaySvgProps) {
   const { viewportWidth, viewportHeight, imageRect, imageWidth, imageHeight, dragRoi } = props;
-  const { currentRoi, currentFixation, pendingNextFixation, trajectory, candidates } = useSimulationStore(
+  const { currentRoi, currentFixation, pendingNextFixation, trajectory, candidates, panelBoxes, showPanelBoxes } = useSimulationStore(
     useShallow((state) => ({
       currentRoi: state.currentRoi,
       currentFixation: state.currentFixation,
       pendingNextFixation: state.pendingNextFixation,
       trajectory: state.trajectory,
       candidates: state.candidates,
+      panelBoxes: state.panelBoxes,
+      showPanelBoxes: state.display.showPanelBoxes,
     })),
   );
 
@@ -48,6 +50,17 @@ export function OverlaySvg(props: OverlaySvgProps) {
       point: pagePointToScreen({ x: candidate.pageX, y: candidate.pageY }, imageRect, imageWidth, imageHeight),
     }));
   }, [candidates, imageHeight, imageRect, imageWidth]);
+
+  const panelBoxRects = useMemo(() => {
+    if (!showPanelBoxes || !imageRect || imageWidth <= 0 || imageHeight <= 0) {
+      return [];
+    }
+    return panelBoxes.map((panel) => ({
+      id: `panel-${panel.panelId}`,
+      rect: pageRectToScreenRect(panel.rect, imageRect, imageWidth, imageHeight),
+      readingIndex: panel.readingIndex,
+    }));
+  }, [imageHeight, imageRect, imageWidth, panelBoxes, showPanelBoxes]);
 
   const currentRoiRect = useMemo(() => {
     if (!imageRect || !currentRoi || imageWidth <= 0 || imageHeight <= 0) {
@@ -172,6 +185,24 @@ export function OverlaySvg(props: OverlaySvgProps) {
             stroke="rgba(34, 21, 5, 0.95)"
             strokeWidth="1.5"
           />
+        </g>
+      ))}
+
+      {panelBoxRects.map((panel) => (
+        <g key={panel.id}>
+          <rect className="overlay-panel-box-shadow" x={panel.rect.x} y={panel.rect.y} width={panel.rect.width} height={panel.rect.height} />
+          <rect className="overlay-panel-box" x={panel.rect.x} y={panel.rect.y} width={panel.rect.width} height={panel.rect.height} />
+          {panel.readingIndex ? (
+            <text
+              className="overlay-panel-label"
+              x={panel.rect.x + panel.rect.width / 2}
+              y={panel.rect.y + panel.rect.height / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+            >
+              {panel.readingIndex}
+            </text>
+          ) : null}
         </g>
       ))}
 

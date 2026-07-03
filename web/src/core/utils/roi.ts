@@ -1,4 +1,5 @@
 import type { Point, RoiRect } from "../../types/simulation";
+import type { PanelRect } from "../../types/simulation";
 
 export type ImageRect = {
   x: number;
@@ -60,6 +61,15 @@ export function roiToScreenRect(roi: RoiRect, imageRect: ImageRect, imageWidth: 
     y: imageRect.y + (roi.y / imageHeight) * imageRect.height,
     width: (roi.size / imageWidth) * imageRect.width,
     height: (roi.size / imageHeight) * imageRect.height,
+  };
+}
+
+export function pageRectToScreenRect(rect: PanelRect, imageRect: ImageRect, imageWidth: number, imageHeight: number): ImageRect {
+  return {
+    x: imageRect.x + (rect.x / imageWidth) * imageRect.width,
+    y: imageRect.y + (rect.y / imageHeight) * imageRect.height,
+    width: (rect.width / imageWidth) * imageRect.width,
+    height: (rect.height / imageHeight) * imageRect.height,
   };
 }
 

@@ -215,6 +215,17 @@ export function FloatingPanel() {
               </select>
             </div>
             <SettingsSection
+              title={t("panel.sections.panels")}
+              toggle={
+                <IconButton active={display.showPanelBoxes} label={t("panel.buttons.togglePanels")} onClick={() => toggleDisplay("showPanelBoxes")}>
+                  <IoEyeOutline />
+                </IconButton>
+              }
+            >
+              <p className="settings-note">{t("panel.sections.panelBoxesNote")}</p>
+            </SettingsSection>
+
+            <SettingsSection
               title={t("panel.sections.preprocess")}
               toggle={
                 <IconButton active={display.showPreprocess} label={t("panel.buttons.togglePreprocess")} onClick={() => toggleDisplay("showPreprocess")}>

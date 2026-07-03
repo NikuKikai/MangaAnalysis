@@ -79,18 +79,18 @@ export function SimulationStage() {
   };
 
   return (
-    <div
-      className="app-shell"
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "copy";
-      }}
-      onDrop={handleDrop}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-    >
-      <div className="canvas-stack">
+    <div className="app-shell">
+      <div
+        className="canvas-stack"
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }}
+        onDrop={handleDrop}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
         <canvas ref={baseCanvasRef} className="stage-canvas" />
         <canvas ref={preprocessCanvasRef} className="stage-canvas preprocess-layer" />
         <canvas ref={heatmapCanvasRef} className="stage-canvas heatmap-layer" />

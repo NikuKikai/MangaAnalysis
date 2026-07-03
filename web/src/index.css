@@ -84,6 +84,9 @@ svg {
 .overlay-history-dot-shadow,
 .overlay-history-dot,
 .overlay-candidate-shadow,
+.overlay-panel-box-shadow,
+.overlay-panel-box,
+.overlay-panel-label,
 .overlay-roi-shadow,
 .overlay-roi,
 .overlay-drag-roi-shadow,
@@ -146,6 +149,26 @@ svg {
 
 .overlay-candidate-shadow {
   fill: rgba(0, 0, 0, 0.4);
+}
+
+.overlay-panel-box-shadow {
+  fill: none;
+  stroke: rgba(0, 0, 0, 0.58);
+  stroke-width: 6;
+}
+
+.overlay-panel-box {
+  fill: rgba(255, 196, 76, 0.06);
+  stroke: rgba(255, 196, 76, 0.96);
+  stroke-width: 2;
+}
+
+.overlay-panel-label {
+  fill: rgba(255, 196, 76, 0.96);
+  stroke: none;
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .overlay-roi-shadow {
@@ -363,6 +386,13 @@ svg {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.settings-note {
+  margin: 0;
+  color: rgba(232, 237, 240, 0.68);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .slider-row {

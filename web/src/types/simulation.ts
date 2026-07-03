@@ -15,6 +15,7 @@ export type DisplayState = {
   showPreprocess: boolean;
   showHeatmap: boolean;
   showHistoryHeatmap: boolean;
+  showPanelBoxes: boolean;
 };
 
 export type SimulationSettings = {
@@ -47,6 +48,20 @@ export type ImageResource = {
   width: number;
   height: number;
   url: string;
+};
+
+export type PanelRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type PanelBox = {
+  panelId: number;
+  rect: PanelRect;
+  score: number;
+  readingIndex: number | null;
 };
 
 export type LoadingPhase = "boot" | "webgpu" | "model" | "ready" | "error";

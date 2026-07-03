@@ -10,10 +10,12 @@ export const resources = {
       },
       panel: {
         sections: {
+          panels: "Panels",
           preprocess: "Preprocess",
           saliency: "Saliency",
           history: "History",
           selector: "Selector",
+          panelBoxesNote: "Detect panel boxes when an image opens and draw them on the overlay.",
         },
         language: {
           label: "Language",
@@ -29,6 +31,7 @@ export const resources = {
           information: "Information",
           expand: "Expand Panel",
           collapse: "Collapse Panel",
+          togglePanels: "Toggle Panel Boxes",
           togglePreprocess: "Toggle Preprocess View",
           toggleSaliency: "Toggle Saliency View",
           toggleHistory: "Toggle History View",
@@ -112,10 +115,12 @@ export const resources = {
       },
       panel: {
         sections: {
+          panels: "コマ",
           preprocess: "前処理",
           saliency: "顕著性",
           history: "履歴",
           selector: "選択",
+          panelBoxesNote: "画像を開いたときにコマの box を検出し、オーバーレイ上に描画します。",
         },
         language: {
           label: "言語",
@@ -131,6 +136,7 @@ export const resources = {
           information: "情報",
           expand: "パネルを展開",
           collapse: "パネルを折りたたむ",
+          togglePanels: "コマ box 表示の切り替え",
           togglePreprocess: "Preprocess 表示の切り替え",
           toggleSaliency: "Saliency 表示の切り替え",
           toggleHistory: "History 表示の切り替え",
