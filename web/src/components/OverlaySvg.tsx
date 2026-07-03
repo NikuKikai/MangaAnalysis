@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useSimulationStore } from "../store/simulationStore";
 import { pagePointToScreen, pageRectToScreenRect, roiToScreenRect, type ImageRect } from "../core/utils/roi";
+import type { Point } from "../types/simulation";
 
 type OverlaySvgProps = {
   viewportWidth: number;
@@ -14,7 +15,7 @@ type OverlaySvgProps = {
 
 export function OverlaySvg(props: OverlaySvgProps) {
   const { viewportWidth, viewportHeight, imageRect, imageWidth, imageHeight, dragRoi } = props;
-  const { currentRoi, currentFixation, pendingNextFixation, trajectory, candidates, panelBoxes, showPanelBoxes } = useSimulationStore(
+  const { currentRoi, currentFixation, pendingNextFixation, trajectory, candidates, panelBoxes, showPanelBoxes, strategy, panelGuidedAnalysis } = useSimulationStore(
     useShallow((state) => ({
       currentRoi: state.currentRoi,
       currentFixation: state.currentFixation,
@@ -23,6 +24,8 @@ export function OverlaySvg(props: OverlaySvgProps) {
       candidates: state.candidates,
       panelBoxes: state.panelBoxes,
       showPanelBoxes: state.display.showPanelBoxes,
+      strategy: state.strategy,
+      panelGuidedAnalysis: state.panelGuidedAnalysis,
     })),
   );
 
@@ -91,6 +94,9 @@ export function OverlaySvg(props: OverlaySvgProps) {
   }, [imageHeight, imageRect, imageWidth, pendingNextFixation]);
 
   const bestCandidateArrow = useMemo(() => {
+    if (strategy !== "saliency_only") {
+      return null;
+    }
     if (!currentFixationPoint || !pendingFixationPoint) {
       return null;
     }
@@ -116,7 +122,36 @@ export function OverlaySvg(props: OverlaySvgProps) {
       x2: endX,
       y2: endY,
     };
-  }, [currentFixationPoint, pendingFixationPoint]);
+  }, [currentFixationPoint, pendingFixationPoint, strategy]);
+
+  const fluidityArrows = useMemo(() => {
+    if (strategy !== "panel_guided" || !imageRect || imageWidth <= 0 || imageHeight <= 0 || !panelGuidedAnalysis) {
+      return [];
+    }
+
+    const maxScore = Math.max(panelGuidedAnalysis.maxScore, 1e-8);
+    return panelGuidedAnalysis.stepScores.flatMap((step) => {
+      if (!step.candidate || step.stepIndex >= trajectory.length) {
+        return [];
+      }
+
+      const start = pagePointToScreen(trajectory[step.stepIndex], imageRect, imageWidth, imageHeight);
+      const end = pagePointToScreen({ x: step.candidate.pageX, y: step.candidate.pageY }, imageRect, imageWidth, imageHeight);
+      const arrow = buildArrowGeometry(start, end, 1 + (step.score / maxScore) * 7);
+      if (!arrow) {
+        return [];
+      }
+
+      return [
+        {
+          ...arrow,
+          id: `fluidity-${step.stepIndex}`,
+          color: step.strongerThanActualNext ? "rgba(255, 72, 72, 0.96)" : "rgba(255, 192, 0, 0.96)",
+          width: arrow.width,
+        },
+      ];
+    });
+  }, [imageHeight, imageRect, imageWidth, panelGuidedAnalysis, strategy, trajectory]);
 
   return (
     <svg
@@ -139,6 +174,24 @@ export function OverlaySvg(props: OverlaySvgProps) {
           <path className="overlay-best-candidate-arrowhead" d="M0 0L16 8L0 16Z" />
         </marker>
       </defs>
+
+      {panelBoxRects.map((panel) => (
+        <g key={panel.id}>
+          <rect className="overlay-panel-box-shadow" x={panel.rect.x} y={panel.rect.y} width={panel.rect.width} height={panel.rect.height} />
+          <rect className="overlay-panel-box" x={panel.rect.x} y={panel.rect.y} width={panel.rect.width} height={panel.rect.height} />
+          {panel.readingIndex ? (
+            <text
+              className="overlay-panel-label"
+              x={panel.rect.x + panel.rect.width / 2}
+              y={panel.rect.y + panel.rect.height / 2}
+              textAnchor="middle"
+              dominantBaseline="central"
+            >
+              {panel.readingIndex}
+            </text>
+          ) : null}
+        </g>
+      ))}
 
       {trajectoryPath ? (
         <>
@@ -167,6 +220,29 @@ export function OverlaySvg(props: OverlaySvgProps) {
         </>
       ) : null}
 
+      {fluidityArrows.map((arrow) => (
+        <g key={arrow.id}>
+          <line
+            className="overlay-fluidity-arrow-shadow"
+            x1={arrow.x1}
+            y1={arrow.y1}
+            x2={arrow.x2}
+            y2={arrow.y2}
+            strokeWidth={arrow.width + 4}
+          />
+          <line
+            x1={arrow.x1}
+            y1={arrow.y1}
+            x2={arrow.x2}
+            y2={arrow.y2}
+            stroke={arrow.color}
+            strokeWidth={arrow.width}
+            strokeLinecap="round"
+          />
+          <polygon points={arrow.headPoints} fill={arrow.color} />
+        </g>
+      ))}
+
       {trajectoryPoints.map((point, index) => (
         <g key={`fixation-history-${index}`}>
           <circle className="overlay-history-dot-shadow" cx={point.x} cy={point.y} r={7} />
@@ -185,24 +261,6 @@ export function OverlaySvg(props: OverlaySvgProps) {
             stroke="rgba(34, 21, 5, 0.95)"
             strokeWidth="1.5"
           />
-        </g>
-      ))}
-
-      {panelBoxRects.map((panel) => (
-        <g key={panel.id}>
-          <rect className="overlay-panel-box-shadow" x={panel.rect.x} y={panel.rect.y} width={panel.rect.width} height={panel.rect.height} />
-          <rect className="overlay-panel-box" x={panel.rect.x} y={panel.rect.y} width={panel.rect.width} height={panel.rect.height} />
-          {panel.readingIndex ? (
-            <text
-              className="overlay-panel-label"
-              x={panel.rect.x + panel.rect.width / 2}
-              y={panel.rect.y + panel.rect.height / 2}
-              textAnchor="middle"
-              dominantBaseline="central"
-            >
-              {panel.readingIndex}
-            </text>
-          ) : null}
         </g>
       ))}
 
@@ -237,4 +295,40 @@ export function OverlaySvg(props: OverlaySvgProps) {
       ) : null}
     </svg>
   );
+}
+
+/**
+ * Build a line plus triangular head for one overlay arrow.
+ */
+function buildArrowGeometry(start: Point, end: Point, width: number) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1) {
+    return null;
+  }
+
+  const ux = dx / length;
+  const uy = dy / length;
+  const startOffset = 10;
+  const endOffset = 15;
+  const x1 = start.x + ux * startOffset;
+  const y1 = start.y + uy * startOffset;
+  const x2 = end.x - ux * endOffset;
+  const y2 = end.y - uy * endOffset;
+  const headLength = 14 + width;
+  const headSpread = 0.45;
+  const leftX = end.x - headLength * (ux * Math.cos(headSpread) - uy * Math.sin(headSpread));
+  const leftY = end.y - headLength * (uy * Math.cos(headSpread) + ux * Math.sin(headSpread));
+  const rightX = end.x - headLength * (ux * Math.cos(-headSpread) - uy * Math.sin(-headSpread));
+  const rightY = end.y - headLength * (uy * Math.cos(-headSpread) + ux * Math.sin(-headSpread));
+
+  return {
+    x1,
+    y1,
+    x2,
+    y2,
+    width,
+    headPoints: `${end.x},${end.y} ${leftX},${leftY} ${rightX},${rightY}`,
+  };
 }

@@ -1,3 +1,4 @@
+import type { PanelRect } from "../../types/simulation";
 import type { ImageRect } from "../utils/roi";
 
 const HISTORY_ACCUMULATE_SHADER = /* wgsl */ `
@@ -8,6 +9,11 @@ struct AccumulateParams {
   fixation_y: f32,
   sigma: f32,
   decay: f32,
+  clip_enabled: u32,
+  clip_x: f32,
+  clip_y: f32,
+  clip_width: f32,
+  clip_height: f32,
 };
 
 @group(0) @binding(0) var<storage, read_write> history_map: array<f32>;
@@ -27,8 +33,16 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   let dy = f32(id.y) - params.fixation_y;
   let sigma_sq = max(params.sigma * params.sigma, 1e-6);
   let gaussian = exp(-0.5 * (dx * dx + dy * dy) / sigma_sq);
+  let inside_clip =
+    params.clip_enabled == 0u ||
+    (
+      f32(id.x) >= params.clip_x &&
+      f32(id.x) <= params.clip_x + params.clip_width &&
+      f32(id.y) >= params.clip_y &&
+      f32(id.y) <= params.clip_y + params.clip_height
+    );
   let index = history_index(id.x, id.y);
-  history_map[index] = history_map[index] * params.decay + gaussian;
+  history_map[index] = history_map[index] * params.decay + select(0.0, gaussian, inside_clip);
 }
 `;
 
@@ -213,7 +227,7 @@ export class HistoryRenderer {
       },
     });
     this.accumulateUniformBuffer = device.createBuffer({
-      size: 32,
+      size: 48,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.uniformBuffer = device.createBuffer({
@@ -273,12 +287,12 @@ export class HistoryRenderer {
     this.device.queue.writeBuffer(this.historyBuffer, 0, new Float32Array(width * height));
   }
 
-  accumulateFixation(fixationX: number, fixationY: number, sigma: number, decay: number): void {
+  accumulateFixation(fixationX: number, fixationY: number, sigma: number, decay: number, clipRect: PanelRect | null = null): void {
     if (this.mapWidth <= 0 || this.mapHeight <= 0) {
       return;
     }
     const clampedDecay = Math.min(0.999, Math.max(0, decay));
-    const uniformBytes = new ArrayBuffer(32);
+    const uniformBytes = new ArrayBuffer(48);
     const view = new DataView(uniformBytes);
     view.setUint32(0, this.mapWidth, true);
     view.setUint32(4, this.mapHeight, true);
@@ -286,6 +300,11 @@ export class HistoryRenderer {
     view.setFloat32(12, fixationY, true);
     view.setFloat32(16, sigma, true);
     view.setFloat32(20, clampedDecay, true);
+    view.setUint32(24, clipRect ? 1 : 0, true);
+    view.setFloat32(28, clipRect?.x ?? 0, true);
+    view.setFloat32(32, clipRect?.y ?? 0, true);
+    view.setFloat32(36, clipRect?.width ?? 0, true);
+    view.setFloat32(40, clipRect?.height ?? 0, true);
     this.device.queue.writeBuffer(this.accumulateUniformBuffer, 0, uniformBytes);
 
     const encoder = this.device.createCommandEncoder();

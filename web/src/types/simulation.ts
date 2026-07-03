@@ -10,6 +10,7 @@ export type RoiRect = {
 };
 
 export type MouseMode = "click" | "box";
+export type SimulationStrategy = "saliency_only" | "panel_guided";
 
 export type DisplayState = {
   showPreprocess: boolean;
@@ -62,6 +63,46 @@ export type PanelBox = {
   rect: PanelRect;
   score: number;
   readingIndex: number | null;
+};
+
+export type PanelGuidedSelectionSource =
+  | "none"
+  | "current_panel"
+  | "next_panel_local"
+  | "next_panel_full_page"
+  | "next_panel_center";
+
+export type PanelGuidedStepState = {
+  stepIndex: number;
+  phase: "start" | "transition";
+  fixation: Point;
+  currentPanelIndex: number | null;
+  currentPanelId: number | null;
+  nextPanelId: number | null;
+  localRoi: RoiRect;
+  usedFullPageRoi: boolean;
+  localCandidates: Candidate[];
+  fallbackCandidates: Candidate[];
+  selectedCandidate: Candidate | null;
+  selectedFixation: Point | null;
+  selectedPanelId: number | null;
+  selectedSource: PanelGuidedSelectionSource;
+  actualTransitionScore: number;
+  note: string;
+};
+
+export type FluidityStep = {
+  stepIndex: number;
+  score: number;
+  candidate: Candidate | null;
+  candidatePanelId: number | null;
+  strongerThanActualNext: boolean;
+};
+
+export type FluidityAnalysis = {
+  stepScores: FluidityStep[];
+  meanScore: number;
+  maxScore: number;
 };
 
 export type LoadingPhase = "boot" | "webgpu" | "model" | "ready" | "error";

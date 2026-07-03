@@ -80,6 +80,7 @@ svg {
 .overlay-history-line,
 .overlay-best-candidate-arrow-shadow,
 .overlay-best-candidate-arrow,
+.overlay-fluidity-arrow-shadow,
 .overlay-best-candidate-arrowhead,
 .overlay-history-dot-shadow,
 .overlay-history-dot,
@@ -110,7 +111,7 @@ svg {
 
 .overlay-history-line {
   fill: none;
-  stroke: rgba(255, 236, 184, 0.96);
+  stroke: rgba(118, 214, 255, 0.98);
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.75;
@@ -147,6 +148,11 @@ svg {
   stroke-linejoin: round;
 }
 
+.overlay-fluidity-arrow-shadow {
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-linecap: round;
+}
+
 .overlay-candidate-shadow {
   fill: rgba(0, 0, 0, 0.4);
 }
@@ -158,13 +164,13 @@ svg {
 }
 
 .overlay-panel-box {
-  fill: rgba(255, 196, 76, 0.06);
-  stroke: rgba(255, 196, 76, 0.96);
+  fill: rgba(124, 147, 168, 0.08);
+  stroke: rgba(124, 147, 168, 0.96);
   stroke-width: 2;
 }
 
 .overlay-panel-label {
-  fill: rgba(255, 196, 76, 0.96);
+  fill: rgba(124, 147, 168, 0.98);
   stroke: none;
   font-size: 34px;
   font-weight: 600;
@@ -269,6 +275,47 @@ svg {
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
     rgba(255, 255, 255, 0.02);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.text-mode-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: nowrap;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015)),
+    rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.text-mode-button {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(240, 244, 246, 0.74);
+  font-size: 12px;
+  line-height: 1.1;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.text-mode-button:hover {
+  color: rgba(255, 247, 237, 0.94);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.text-mode-button.is-active {
+  color: #ffd49b;
+  background: rgba(255, 179, 88, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(255, 195, 110, 0.28);
 }
 
 .mode-group > .icon-button {

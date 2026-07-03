@@ -6,6 +6,8 @@ import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { PreprocessRenderer } from "../core/gpu/preprocessRenderer";
 import { SaliencySession } from "../core/onnx/saliencySession";
 import { analyzePanels } from "../core/panel_order/detector";
+import { analyzeFluidityStep, summarizeFluidity } from "../core/strategies/analysis";
+import { buildPanelGuidedStep, filterCandidatesToPanel, findPanelIndexForFixation, orderPanelsByReadingOrder } from "../core/strategies/panelGuided";
 import { drawBaseImage, resizeAndClear2dCanvas } from "../core/utils/canvas2d";
 import {
   createCenteredSquareRoi,
@@ -18,7 +20,7 @@ import {
   type ImageRect,
 } from "../core/utils/roi";
 import { useSimulationStore } from "../store/simulationStore";
-import type { Candidate, ImageResource, Point, RoiRect } from "../types/simulation";
+import type { Candidate, ImageResource, PanelBox, Point, RoiRect } from "../types/simulation";
 import { useViewportSize } from "./useViewportSize";
 
 type Engine = {
@@ -110,13 +112,18 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const currentFixation = useSimulationStore((state) => state.currentFixation);
   const pendingNextFixation = useSimulationStore((state) => state.pendingNextFixation);
   const trajectory = useSimulationStore((state) => state.trajectory);
+  const strategy = useSimulationStore((state) => state.strategy);
+  const panelBoxes = useSimulationStore((state) => state.panelBoxes);
+  const panelReadingOrder = useSimulationStore((state) => state.panelReadingOrder);
+  const panelGuidedCurrentPanelIndex = useSimulationStore((state) => state.panelGuidedCurrentPanelIndex);
+  const panelGuidedStepStates = useSimulationStore((state) => state.panelGuidedStepStates);
   const dragStart = useSimulationStore((state) => state.dragStart);
   const dragCurrent = useSimulationStore((state) => state.dragCurrent);
   const isDragging = useSimulationStore((state) => state.isDragging);
   const mode = useSimulationStore((state) => state.mode);
   const setLoadingState = useSimulationStore((state) => state.setLoadingState);
   const setError = useSimulationStore((state) => state.setError);
-  const setPanelBoxes = useSimulationStore((state) => state.setPanelBoxes);
+  const setPanelDetection = useSimulationStore((state) => state.setPanelDetection);
   const setWebgpuAvailable = useSimulationStore((state) => state.setWebgpuAvailable);
   const applyStepOutcome = useSimulationStore((state) => state.applyStepOutcome);
 
@@ -136,6 +143,14 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     }
     return createSquareFromDrag(dragStart, dragCurrent);
   }, [dragCurrent, dragStart, isDragging, mode]);
+
+  // Panel-guided stepping needs the detector reading order materialized as an ordered panel list.
+  const orderedPanels = useMemo<PanelBox[]>(() => {
+    if (panelBoxes.length === 0 || panelReadingOrder.length === 0) {
+      return [];
+    }
+    return orderPanelsByReadingOrder(panelBoxes, panelReadingOrder);
+  }, [panelBoxes, panelReadingOrder]);
 
   // Recompute the fitted image rectangle whenever the viewport or image changes.
   useEffect(() => {
@@ -185,7 +200,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   // Detect panel boxes whenever a new page image is loaded so the overlay can visualize them immediately.
   useEffect(() => {
     if (!image) {
-      setPanelBoxes([]);
+      setPanelDetection([], []);
       return;
     }
 
@@ -199,17 +214,18 @@ export function SimulationProvider({ children }: PropsWithChildren) {
             // Convert the reading order array into 1-based labels for the overlay.
             readingIndexByPanelId.set(panelId, index + 1);
           });
-          setPanelBoxes(
+          setPanelDetection(
             analysis.panels.map((panel) => ({
               ...panel,
               readingIndex: readingIndexByPanelId.get(panel.panelId) ?? null,
             })),
+            analysis.readingOrder,
           );
         }
       } catch (error) {
         console.error("Panel detection failed.", error);
         if (!cancelled) {
-          setPanelBoxes([]);
+          setPanelDetection([], []);
         }
       }
     };
@@ -218,7 +234,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [image, setPanelBoxes]);
+  }, [image, setPanelDetection]);
 
   // Reset GPU-side simulation buffers when the logical simulation state is cleared.
   useEffect(() => {
@@ -381,8 +397,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     };
   };
 
-  // Run one simulation step: update history, preprocess ROI input, infer heatmap, then select candidates.
-  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
+  // Run one saliency-only step: update global history, score the local ROI, then fall back to the full page if needed.
+  const runSaliencyOnlyStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
     const engine = engineRef.current;
     if (!engine || !image) {
       return;
@@ -398,9 +414,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       image.height * settings.historySigmaRatio,
       settings.historyDecay,
     );
-    {
-      renderHistoryOverlay(engine, imageRect);
-    }
+    renderHistoryOverlay(engine, imageRect);
 
     let stepResult = await runStepOnce(engine, image, initialRoi, fixation);
     if (stepResult.candidates.length === 0) {
@@ -422,6 +436,86 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       pendingNextFixation,
       committedTrajectory,
     });
+  };
+
+  // Run one panel-guided step: write history inside the active panel, then apply the panel-order transition rules.
+  const runPanelGuidedStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], stepIndex: number) => {
+    const engine = engineRef.current;
+    if (!engine || !image || orderedPanels.length === 0) {
+      return;
+    }
+
+    if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
+      engine.historyMapWidth = image.width;
+      engine.historyMapHeight = image.height;
+      engine.historyRenderer.initialize(image.width, image.height);
+    }
+
+    const currentPanelIndex =
+      stepIndex === 0
+        ? findPanelIndexForFixation(orderedPanels, fixation)
+        : (panelGuidedCurrentPanelIndex ?? findPanelIndexForFixation(orderedPanels, fixation));
+    const currentPanel = orderedPanels[currentPanelIndex];
+    const nextPanel = orderedPanels[currentPanelIndex + 1] ?? null;
+
+    engine.historyRenderer.accumulateFixation(
+      fixation.x,
+      fixation.y,
+      image.height * settings.historySigmaRatio,
+      settings.historyDecay,
+      currentPanel.rect,
+    );
+    renderHistoryOverlay(engine, imageRect);
+
+    const localEval = await runStepOnce(engine, image, initialRoi, fixation);
+    const currentPanelCandidates = filterCandidatesToPanel(localEval.candidates, currentPanel);
+    const nextPanelCandidates = filterCandidatesToPanel(localEval.candidates, nextPanel);
+
+    const fullPageRoi = createFullPageSquareRoi(image.width, image.height);
+    let fallbackCandidates: Candidate[] = [];
+    let fallbackEvalCandidates: Candidate[] | null = null;
+    let displayedRoi = localEval.roi;
+    let displayedCandidates = localEval.candidates;
+    if (currentPanelCandidates.length === 0 && nextPanelCandidates.length === 0 && nextPanel) {
+      const fallbackEval = await runStepOnce(engine, image, fullPageRoi, fixation);
+      fallbackCandidates = filterCandidatesToPanel(fallbackEval.candidates, nextPanel);
+      fallbackEvalCandidates = fallbackEval.candidates;
+      displayedRoi = fallbackEval.roi;
+      displayedCandidates = fallbackEval.candidates;
+    }
+
+    const { nextFixation, nextPanelIndex, stepState } = buildPanelGuidedStep({
+      currentFixation: fixation,
+      currentPanelIndex,
+      orderedPanels,
+      localRoi: localEval.roi,
+      localCandidates: localEval.candidates,
+      fallbackCandidates,
+      stepIndex,
+    });
+    const priorStepStates = stepIndex === 0 ? [] : panelGuidedStepStates;
+    const nextStepScores = [...priorStepStates.map((step) => analyzeFluidityStep(step, orderedPanels)), analyzeFluidityStep(stepState, orderedPanels)];
+    const panelGuidedAnalysis = summarizeFluidity(nextStepScores);
+
+    applyStepOutcome({
+      roi: displayedRoi,
+      fixation,
+      candidates: displayedCandidates,
+      pendingNextFixation: nextFixation,
+      committedTrajectory,
+      panelGuidedCurrentPanelIndex: nextPanelIndex,
+      panelGuidedStepState: stepState,
+      panelGuidedAnalysis,
+    });
+  };
+
+  // Dispatch one step to the active strategy implementation.
+  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
+    if (strategy === "panel_guided") {
+      await runPanelGuidedStep(initialRoi, fixation, committedTrajectory, committedTrajectory.length - 1);
+      return;
+    }
+    await runSaliencyOnlyStep(initialRoi, fixation, committedTrajectory);
   };
 
   // Start a click-driven step using the configured square ROI around the click point.

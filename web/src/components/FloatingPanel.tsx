@@ -10,6 +10,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useSimulationEngineContext } from "../app/SimulationRuntime";
 import { IconButton } from "./IconButton";
 import type { AppLanguage } from "../i18n/resources";
+import type { SimulationStrategy } from "../types/simulation";
 import { useSimulationStore } from "../store/simulationStore";
 
 type SliderControlProps = {
@@ -109,11 +110,13 @@ export function FloatingPanel() {
     image,
     currentRoi,
     mode,
+    strategy,
     display,
     settings,
     pendingNextFixation,
     loadImageFile,
     setMode,
+    setStrategy,
     updateSetting,
     toggleDisplay,
     clearSimulation,
@@ -123,11 +126,13 @@ export function FloatingPanel() {
         image: state.image,
         currentRoi: state.currentRoi,
         mode: state.mode,
+        strategy: state.strategy,
         display: state.display,
         settings: state.settings,
         pendingNextFixation: state.pendingNextFixation,
         loadImageFile: state.loadImageFile,
         setMode: state.setMode,
+        setStrategy: state.setStrategy,
         updateSetting: state.updateSetting,
         toggleDisplay: state.toggleDisplay,
         clearSimulation: state.clearSimulation,
@@ -157,6 +162,10 @@ export function FloatingPanel() {
   const handleLanguageChange = (event: ChangeEvent<HTMLSelectElement>) => {
     void i18n.changeLanguage(event.target.value as AppLanguage);
   };
+  const strategyOptions: Array<{ id: SimulationStrategy; label: string }> = [
+    { id: "saliency_only", label: t("panel.buttons.saliencyOnlyStrategy") },
+    { id: "panel_guided", label: t("panel.buttons.panelGuidedStrategy") },
+  ];
 
   return (
     <>
@@ -329,6 +338,18 @@ export function FloatingPanel() {
             </SettingsSection>
 
             <SettingsSection title={t("panel.sections.selector")}>
+              <div className="text-mode-group" role="group" aria-label={t("panel.sections.selector")}>
+                {strategyOptions.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`text-mode-button${strategy === option.id ? " is-active" : ""}`}
+                    onClick={() => setStrategy(option.id)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
               <SliderControl
                 label={t("panel.sliders.dist.label")}
                 title={t("panel.sliders.dist.tooltip", {
