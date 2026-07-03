@@ -92,7 +92,11 @@ class FluidityAnalysis:
 
 @dataclass(slots=True)
 class SimulationResult:
-    """Unified simulation result returned by every reading strategy."""
+    """Unified simulation result returned by every reading strategy.
+
+    The stored `history_map` is the materialized CPU export of the final GPU-side
+    suppression map so downstream visualization and JSON generation stay simple.
+    """
 
     page_path: str
     strategy: str
@@ -102,6 +106,8 @@ class SimulationResult:
     panels: list[Panel] = field(default_factory=list)
     panel_reading_order: list[int] = field(default_factory=list)
     analysis: FluidityAnalysis | None = None
+    timing_summary: dict[str, float] = field(default_factory=dict)
+    timing_counts: dict[str, int] = field(default_factory=dict)
 
     def to_json(self) -> dict:
         """Serialize the simulation result into a JSON-friendly dictionary."""
@@ -113,4 +119,6 @@ class SimulationResult:
             "panel_reading_order": [int(panel_id) for panel_id in self.panel_reading_order],
             "steps": [step.to_json() for step in self.step_states],
             "analysis": None if self.analysis is None else self.analysis.to_json(),
+            "timing_summary": {key: float(value) for key, value in self.timing_summary.items()},
+            "timing_counts": {key: int(value) for key, value in self.timing_counts.items()},
         }

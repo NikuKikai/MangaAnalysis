@@ -17,7 +17,6 @@ class SimulationConfig:
         metadata={"doc": "Half of the default square ROI size as a ratio of page height."},
     )
     clear_radius_ratio: float = field(default=0.06, metadata={"doc": "Radius of the sharp foveal area as a ratio of page height."})
-    blur_level_count: int = field(default=8, metadata={"doc": "Number of blur levels used to approximate continuous peripheral blur."})
     max_blur_strength: float = field(default=7.0, metadata={"doc": "Maximum peripheral blur strength at the ROI outer radius."})
     history_sigma_ratio: float = field(default=0.047, metadata={"doc": "Sigma of the revisit-suppression Gaussian as a ratio of page height."})
     history_decay: float = field(default=0.94, metadata={"doc": "Per-step decay applied to the history map before adding the new fixation bump."})

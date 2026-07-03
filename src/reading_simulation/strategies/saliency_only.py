@@ -4,7 +4,7 @@ from PIL import Image
 
 from ..config import SimulationConfig
 from ..engine import SaliencyScanpathEngine
-from ..history import add_fixation_to_history, create_history_map
+from ..history import add_fixation_to_history, create_history_map, materialize_history_map
 from ..types import SimulationResult, StepState
 
 
@@ -26,7 +26,7 @@ class SaliencyOnlyStrategy:
         page_image = Image.open(page_path).convert("RGB")
         page_width, page_height = page_image.size
         history_sigma = self.engine.scale_float(page_height, self.config.history_sigma_ratio)
-        history_map = create_history_map(page_height, page_width)
+        history_map = create_history_map(page_height, page_width, self.engine.history_device)
         if initial_fixation is None:
             raise ValueError("initial_fixation is required to match the current web simulation flow.")
 
@@ -88,7 +88,7 @@ class SaliencyOnlyStrategy:
             page_path=page_path,
             strategy="saliency_only",
             fixations=fixations,
-            history_map=history_map,
+            history_map=materialize_history_map(history_map),
             step_states=step_states,
         )
 

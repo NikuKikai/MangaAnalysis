@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import numpy as np
+import torch
+import torch.nn.functional as F
 
 
 @dataclass(slots=True)
@@ -19,39 +20,38 @@ class CandidatePoint:
     distance_score: float
     final_score: float
 
-
-def _max_pool_2d(array: np.ndarray, radius: int) -> np.ndarray:
-    """Compute a slow but simple local max-pooling map for 2D arrays."""
-    if radius <= 0:
-        return array
-    height, width = array.shape
-    pooled = np.empty_like(array)
-    for y in range(height):
-        top = max(0, y - radius)
-        bottom = min(height, y + radius + 1)
-        for x in range(width):
-            left = max(0, x - radius)
-            right = min(width, x + radius + 1)
-            pooled[y, x] = float(array[top:bottom, left:right].max())
-    return pooled
-
-
-def extract_local_maxima(
-    score_map: np.ndarray,
+def extract_local_maxima_torch(
+    score_map: torch.Tensor,
     nms_radius: int,
     top_k: int,
     min_score: float = 0.0,
 ) -> list[tuple[int, int, float]]:
-    """Return the top local maxima after thresholding and non-maximum suppression."""
-    if score_map.size == 0:
+    """Return top local maxima from a 2D torch score map using tensor max-pooling."""
+    if score_map.ndim != 2 or score_map.numel() == 0:
         return []
 
-    pooled = _max_pool_2d(score_map, nms_radius)
-    mask = (score_map >= float(min_score)) & (score_map >= pooled - 1e-8)
-    points = np.argwhere(mask)
-    ranked = sorted(
-        ((int(y), int(x), float(score_map[y, x])) for y, x in points),
-        key=lambda item: item[2],
-        reverse=True,
-    )
-    return ranked[:top_k]
+    if nms_radius <= 0:
+        pooled = score_map
+    else:
+        kernel_size = int(nms_radius) * 2 + 1
+        pooled = F.max_pool2d(
+            score_map.unsqueeze(0).unsqueeze(0),
+            kernel_size=kernel_size,
+            stride=1,
+            padding=int(nms_radius),
+        ).squeeze(0).squeeze(0)
+
+    # Keep only true local maxima above the requested minimum score.
+    peak_mask = (score_map >= float(min_score)) & (score_map >= pooled - 1e-8)
+    peak_indices = torch.nonzero(peak_mask, as_tuple=False)
+    if peak_indices.numel() == 0:
+        return []
+
+    peak_scores = score_map[peak_mask]
+    keep_count = min(int(top_k), int(peak_scores.numel()))
+    top_scores, top_order = torch.topk(peak_scores, k=keep_count, largest=True, sorted=True)
+    top_indices = peak_indices[top_order]
+    return [
+        (int(index[0].item()), int(index[1].item()), float(score.item()))
+        for index, score in zip(top_indices, top_scores, strict=False)
+    ]

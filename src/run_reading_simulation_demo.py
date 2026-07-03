@@ -4,6 +4,7 @@ import argparse
 import json
 import site
 from pathlib import Path
+from time import perf_counter
 
 from PIL import Image
 
@@ -43,14 +44,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     """Execute the selected reading-simulation strategy on one page."""
     args = parse_args()
+    inference_start = perf_counter()
     inference = SaliencyInference(str(CONFIG_PATH), str(CHECKPOINT_PATH))
+    inference_elapsed = perf_counter() - inference_start
     simulator = ReadingSimulator(
         inference,
         SimulationConfig(
             strategy=args.strategy,
             default_roi_half_size_ratio=0.25,
             clear_radius_ratio=0.06,
-            blur_level_count=8,
             max_blur_strength=7.0,
             history_sigma_ratio=0.047,
             history_decay=0.94,
@@ -65,16 +67,29 @@ def main() -> None:
     with Image.open(args.image) as page_image:
         page_width, page_height = page_image.size
     initial_fixation = (page_width * 0.9, page_height * 0.1)
+    simulate_start = perf_counter()
     result = simulator.simulate(str(args.image), initial_fixation=initial_fixation)
+    simulate_elapsed = perf_counter() - simulate_start
 
     # Persist both the structured trace and the default visualization for inspection.
+    save_start = perf_counter()
     save_visualization(result, str(args.output_image))
+    save_elapsed = perf_counter() - save_start
     args.output_json.write_text(json.dumps(result.to_json(), indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Strategy: {result.strategy}")
     print(f"Fixations: {len(result.fixations)}")
     if result.analysis is not None:
         print(f"Reading fluidity mean score: {result.analysis.mean_score:.4f}")
         print(f"Reading fluidity max score: {result.analysis.max_score:.4f}")
+    print(f"Model init: {inference_elapsed:.3f}s")
+    print(f"Simulation: {simulate_elapsed:.3f}s")
+    print(f"Visualization save: {save_elapsed:.3f}s")
+    if result.timing_summary:
+        print("Timing summary:")
+        for key, elapsed in sorted(result.timing_summary.items(), key=lambda item: item[1], reverse=True):
+            count = result.timing_counts.get(key, 1)
+            average = elapsed / max(count, 1)
+            print(f"  {key}: total={elapsed:.3f}s count={count} avg={average:.3f}s")
     print(f"Saved image to: {args.output_image}")
     print(f"Saved json to: {args.output_json}")
     if args.show:

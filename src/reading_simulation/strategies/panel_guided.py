@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from PIL import Image
 import numpy as np
+from time import perf_counter
 
 from panel_order.detector import PanelDetector
 from panel_order.layout import MangaLayoutAnalyzer
@@ -10,7 +11,7 @@ from panel_order.types import Panel, Rect
 from ..analysis import analyze_reading_fluidity
 from ..config import SimulationConfig
 from ..engine import SaliencyScanpathEngine
-from ..history import add_fixation_to_history, create_history_map
+from ..history import add_fixation_to_history, create_history_map, materialize_history_map
 from ..types import SimulationResult, StepState
 
 
@@ -31,17 +32,27 @@ class PanelGuidedStrategy:
         initial_roi_size: int | None = None,
     ) -> SimulationResult:
         """Simulate a scanpath that follows detected panel order while using saliency inside each panel."""
+        timing_summary: dict[str, float] = {}
+        timing_counts: dict[str, int] = {}
+        total_start = perf_counter()
+
+        page_load_start = perf_counter()
         page_image = Image.open(page_path).convert("RGB")
         page_array = np.asarray(page_image)
         page_width, page_height = page_image.size
+        _add_timing(timing_summary, timing_counts, "load_page", perf_counter() - page_load_start)
         history_sigma = self.engine.scale_float(page_height, self.config.history_sigma_ratio)
-        history_map = create_history_map(page_height, page_width)
+        history_map = create_history_map(page_height, page_width, self.engine.history_device)
 
         # Detect panels once and derive the Japanese reading order used by this strategy.
+        detect_start = perf_counter()
         panels = self.panel_detector.detect(page_array)
+        _add_timing(timing_summary, timing_counts, "panel_detect", perf_counter() - detect_start)
         if not panels:
             raise RuntimeError("Panel-guided strategy requires at least one detected panel.")
+        layout_start = perf_counter()
         _layout_tree, panel_reading_order = self.layout_analyzer.build_layout(panels)
+        _add_timing(timing_summary, timing_counts, "panel_layout", perf_counter() - layout_start)
         ordered_panels = [_panel_by_id(panels, panel_id) for panel_id in panel_reading_order]
 
         current_panel_index = 0
@@ -59,6 +70,7 @@ class PanelGuidedStrategy:
             next_panel = ordered_panels[current_panel_index + 1] if current_panel_index + 1 < len(ordered_panels) else None
 
             # Update history only inside the current panel so panel-to-panel progress stays localized.
+            history_start = perf_counter()
             add_fixation_to_history(
                 history_map,
                 current_fixation,
@@ -66,11 +78,18 @@ class PanelGuidedStrategy:
                 decay=self.config.history_decay,
                 clip_rect=current_panel.rect,
             )
+            _add_timing(timing_summary, timing_counts, "history_update", perf_counter() - history_start)
 
             # Always score candidates with the original local ROI settings first.
+            local_eval_start = perf_counter()
             local_eval = self.engine.evaluate_roi(page_image, current_fixation, roi_size, history_map, page_height)
+            _add_timing(timing_summary, timing_counts, "local_eval_total", perf_counter() - local_eval_start)
+            _merge_timings(timing_summary, timing_counts, "local", local_eval.timings)
+
+            filter_start = perf_counter()
             current_panel_candidates = self.engine.filter_candidates_to_rect(local_eval.candidates, current_panel.rect)
             next_panel_candidates = self.engine.filter_candidates_to_rect(local_eval.candidates, None if next_panel is None else next_panel.rect)
+            _add_timing(timing_summary, timing_counts, "filter_candidates", perf_counter() - filter_start)
 
             fallback_candidates = []
             used_full_page_roi = False
@@ -98,6 +117,7 @@ class PanelGuidedStrategy:
 
             # Priority 3: if the local ROI still cannot enter the next panel, retry with a full-page ROI.
             elif next_panel is not None:
+                full_eval_start = perf_counter()
                 full_page_eval = self.engine.evaluate_roi(
                     page_image,
                     current_fixation,
@@ -105,8 +125,12 @@ class PanelGuidedStrategy:
                     history_map,
                     page_height,
                 )
+                _add_timing(timing_summary, timing_counts, "fallback_eval_total", perf_counter() - full_eval_start)
+                _merge_timings(timing_summary, timing_counts, "fallback", full_page_eval.timings)
                 used_full_page_roi = True
+                fallback_filter_start = perf_counter()
                 fallback_candidates = self.engine.filter_candidates_to_rect(full_page_eval.candidates, next_panel.rect)
+                _add_timing(timing_summary, timing_counts, "fallback_filter_candidates", perf_counter() - fallback_filter_start)
                 if fallback_candidates:
                     selected_candidate = fallback_candidates[0]
                     selected_fixation = self.engine.candidate_to_point(selected_candidate)
@@ -160,12 +184,17 @@ class PanelGuidedStrategy:
             page_path=page_path,
             strategy="panel_guided",
             fixations=fixations,
-            history_map=history_map,
+            history_map=materialize_history_map(history_map),
             step_states=step_states,
             panels=ordered_panels,
             panel_reading_order=panel_reading_order,
         )
+        analysis_start = perf_counter()
         result.analysis = analyze_reading_fluidity(result)
+        _add_timing(timing_summary, timing_counts, "analyze_reading_fluidity", perf_counter() - analysis_start)
+        _add_timing(timing_summary, timing_counts, "panel_guided_total", perf_counter() - total_start)
+        result.timing_summary = timing_summary
+        result.timing_counts = timing_counts
         return result
 
 
@@ -202,3 +231,15 @@ def _roi_rect(page_image: Image.Image, fixation: tuple[float, float], roi_size: 
         width=int(roi_window.image.width),
         height=int(roi_window.image.height),
     )
+
+
+def _add_timing(summary: dict[str, float], counts: dict[str, int], key: str, elapsed: float) -> None:
+    """Accumulate one timing measurement."""
+    summary[key] = summary.get(key, 0.0) + float(elapsed)
+    counts[key] = counts.get(key, 0) + 1
+
+
+def _merge_timings(summary: dict[str, float], counts: dict[str, int], prefix: str, timings: dict[str, float]) -> None:
+    """Merge one nested timing dictionary into the strategy timing accumulators."""
+    for key, elapsed in timings.items():
+        _add_timing(summary, counts, f"{prefix}.{key}", elapsed)

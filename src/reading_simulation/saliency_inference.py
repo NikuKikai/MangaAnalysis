@@ -13,12 +13,15 @@ from saliency.datasets.common import IMAGENET_MEAN, IMAGENET_STD, resize_with_pa
 
 
 def resolve_device(device_name: str) -> torch.device:
-    """Resolve the configured device name into an actual torch device."""
+    """Resolve the configured device name into a CUDA device for GPU-only reading simulation."""
     if device_name != "auto":
-        return torch.device(device_name)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
+        device = torch.device(device_name)
+        if device.type != "cuda":
+            raise RuntimeError("Reading simulation requires a CUDA device.")
+        return device
+    if not torch.cuda.is_available():
+        raise RuntimeError("Reading simulation requires CUDA, but no CUDA device is available.")
+    return torch.device("cuda")
 
 
 class SaliencyInference:
@@ -47,17 +50,16 @@ class SaliencyInference:
         tensor = (tensor - IMAGENET_MEAN) / IMAGENET_STD
         return tensor.unsqueeze(0)
 
-    def predict(self, image: Image.Image) -> tuple[np.ndarray, Image.Image]:
-        """Predict a normalized saliency map and its grayscale preview image."""
-        original_size = image.size
-        input_tensor = self._image_to_tensor(image).to(self.device)
-        with torch.no_grad():
-            logits = self.model(input_tensor)
-            saliency_tensor = sigmoid_map(logits).squeeze(0).squeeze(0).detach().cpu().numpy()
+    def _normalize_saliency_tensor(self, saliency_tensor: torch.Tensor) -> torch.Tensor:
+        """Normalize one model-resolution saliency tensor in place-compatible tensor form."""
+        saliency = saliency_tensor.to(dtype=torch.float32)
+        saliency = saliency - saliency.min()
+        saliency = saliency / torch.clamp(saliency.max(), min=1e-8)
+        return saliency
 
-        saliency = saliency_tensor.astype(np.float32)
-        saliency = saliency - float(saliency.min())
-        saliency = saliency / max(float(saliency.max()), 1e-8)
+    def _format_prediction(self, saliency_tensor: torch.Tensor, original_size: tuple[int, int]) -> tuple[np.ndarray, Image.Image]:
+        """Resize and normalize raw model output so callers receive the legacy result shape."""
+        saliency = self._normalize_saliency_tensor(saliency_tensor).detach().cpu().numpy()
         heatmap_image = Image.fromarray(np.clip(saliency * 255.0, 0.0, 255.0).astype(np.uint8), mode="L")
         if heatmap_image.size != original_size:
             heatmap_image = heatmap_image.resize(original_size, Image.Resampling.BILINEAR)
@@ -65,3 +67,15 @@ class SaliencyInference:
         resized_saliency = resized_saliency - float(resized_saliency.min())
         resized_saliency = resized_saliency / max(float(resized_saliency.max()), 1e-8)
         return resized_saliency, heatmap_image
+
+    def predict_tensor_raw(self, input_tensor: torch.Tensor) -> torch.Tensor:
+        """Run inference from a preprocessed tensor and keep the normalized saliency map on GPU."""
+        model_input = input_tensor.to(self.device)
+        with torch.no_grad():
+            logits = self.model(model_input)
+            saliency_tensor = sigmoid_map(logits).squeeze(0).squeeze(0)
+        return self._normalize_saliency_tensor(saliency_tensor)
+
+    def predict_tensor(self, input_tensor: torch.Tensor, original_size: tuple[int, int]) -> tuple[np.ndarray, Image.Image]:
+        """Run inference from a preprocessed NCHW tensor instead of a PIL image."""
+        return self._format_prediction(self.predict_tensor_raw(input_tensor), original_size)

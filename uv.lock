@@ -565,6 +565,7 @@ dependencies = [
     { name = "pillow" },
     { name = "torch" },
     { name = "torchvision" },
+    { name = "wgpu" },
 ]
 
 [package.dev-dependencies]
@@ -584,6 +585,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=11.3,<12" },
     { name = "torch", specifier = ">=2.11.0,<2.12", index = "https://download.pytorch.org/whl/cu126" },
     { name = "torchvision", specifier = ">=0.26.0,<0.27", index = "https://download.pytorch.org/whl/cu126" },
+    { name = "wgpu", specifier = ">=0.31.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -1363,6 +1365,27 @@ wheels = [
 ]
 
 [[package]]
+name = "rendercanvas"
+version = "2.6.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dc/40/e162bd1eace4392d945fc8ffe90c9cceffeffd0eea227c4e60638a5f30d5/rendercanvas-2.6.3.tar.gz", hash = "sha256:c944ae7b6d89f7d25f2c72216d31cb28f0051f766ec49d049101bb961baaaaac", size = 90228, upload-time = "2026-03-12T13:43:10.272Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c1/b2/b06d7d89eef452ab50ad3e752604c09ec08c8eaf49484641e566a0e5141d/rendercanvas-2.6.3-py3-none-any.whl", hash = "sha256:c2defd04e3e29dcdf94b794e827045882925677bc48b04084f3b9696fd469018", size = 105194, upload-time = "2026-03-12T13:43:08.965Z" },
+]
+
+[[package]]
+name = "rubicon-objc"
+version = "0.5.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0d/26/3e6bb0bfd41ff446d29931205088556055ec18c31bf099d6719c281c448c/rubicon_objc-0.5.6.tar.gz", hash = "sha256:0d3b0a9889f72916c095a58e7e1c275c260cb8a86b8ef8b909e60cb002fd54d5", size = 189833, upload-time = "2026-07-02T06:08:16.38Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/a6/cf07f7f931a7fab57b866ed086b15e75bff4a908084b71e74b42798207bf/rubicon_objc-0.5.6-py3-none-any.whl", hash = "sha256:b53f6fc458d78ddf2ce82365c34e234ae85cd8217c983438ae4bf9e1bd1252b3", size = 66152, upload-time = "2026-07-02T06:08:14.995Z" },
+]
+
+[[package]]
 name = "setuptools"
 version = "81.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1530,4 +1553,24 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2c/ee/afaf0f85a9a18fe47a67f1e4422ed6cf1fe642f0ae0a2f81166231303c52/wcwidth-0.7.0.tar.gz", hash = "sha256:90e3a7ea092341c44b99562e75d09e4d5160fe7a3974c6fb842a101a95e7eed0", size = 182132, upload-time = "2026-05-02T16:04:12.653Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/41/52/e465037f5375f43533d1a80b6923955201596a99142ed524d77b571a1418/wcwidth-0.7.0-py3-none-any.whl", hash = "sha256:5d69154c429a82910e241c738cd0e2976fac8a2dd47a1a805f4afed1c0f136f2", size = 110825, upload-time = "2026-05-02T16:04:11.033Z" },
+]
+
+[[package]]
+name = "wgpu"
+version = "0.31.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+    { name = "rendercanvas" },
+    { name = "rubicon-objc", marker = "sys_platform == 'darwin'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/51/07/c8f8ae8f092199045fdd7fd4e02bd1b394fd15ceef449a3dc241296139ca/wgpu-0.31.1.tar.gz", hash = "sha256:3d2a1d06dde4bb2e3cd9fc21296bd58d40bb0acea6ad36a396fbca244ce63c6f", size = 161874, upload-time = "2026-06-23T08:45:45.461Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/bf/e55adbaca00b4af2749fa2736eecb4eb195da64f94527267472096416b41/wgpu-0.31.1-py3-none-macosx_10_9_x86_64.whl", hash = "sha256:db31be8ad1835a782267c8e4d4bdc3764d9d34bb72085cf85c8b6c5da11581da", size = 2793582, upload-time = "2026-06-23T08:45:34.066Z" },
+    { url = "https://files.pythonhosted.org/packages/78/e0/dee9e5d30751bd2f7b35d2fe6b8f9b4426c7cf8673014af8a0e2cb0110af/wgpu-0.31.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:7638b131aeb3fd808607ceb3bbeebf9f73bf7a2305b8d0b2097ca5c67d3db0a6", size = 2685084, upload-time = "2026-06-23T08:45:35.828Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/8b/6f39c7bb44155865186548808b4852592d34b31e46f752f90faea9f05fa7/wgpu-0.31.1-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:4de89e4bce6b01d5fa947afaa094dbc7eedd9697f6f7f1cfe7515bed88d46241", size = 3392467, upload-time = "2026-06-23T08:45:37.23Z" },
+    { url = "https://files.pythonhosted.org/packages/59/56/1cfc9ca1b6e9bf6c313a7dae806605b7f939152e2fb4c35e5bf4e8e73263/wgpu-0.31.1-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:8fb5748265fe8a3042ddbc40c2ac55718ef34880311ed088ba728ba59592aa6a", size = 3395081, upload-time = "2026-06-23T08:45:38.716Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/74/b83096797367d25e3b179112f4388d3dcc570a8161eb2594f18e74a51c0b/wgpu-0.31.1-py3-none-win32.whl", hash = "sha256:5429fc3b81ac1e4758b5f5b8a8dd04dff2d2f518effe7e4b76eaf9fbc98db7c0", size = 3062216, upload-time = "2026-06-23T08:45:40.441Z" },
+    { url = "https://files.pythonhosted.org/packages/85/54/bb02cee059e1ddb669b89f859b1f0c1b0fbe0eb78d49acfd7c4946bd2ba7/wgpu-0.31.1-py3-none-win_amd64.whl", hash = "sha256:a3027b118e52d94e26c4057fab8859b6235ca988530b484e6c559bc00f3b9ef7", size = 3243251, upload-time = "2026-06-23T08:45:42.406Z" },
+    { url = "https://files.pythonhosted.org/packages/36/93/71bc5fbe8da462f4dcc90e15b33c97dd25d39939eba96501d76931c10708/wgpu-0.31.1-py3-none-win_arm64.whl", hash = "sha256:798e67ad518a5cf8344e7fdf07dfe71935298bd0585e1e794c22a9286234f2eb", size = 3059345, upload-time = "2026-06-23T08:45:44.08Z" },
 ]

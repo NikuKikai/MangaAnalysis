@@ -14,6 +14,7 @@ dependencies = [
     "pillow>=11.3,<12",
     "torch>=2.11.0,<2.12",
     "torchvision>=0.26.0,<0.27",
+    "wgpu>=0.31.1",
 ]
 
 [dependency-groups]

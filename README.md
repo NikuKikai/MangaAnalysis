@@ -21,7 +21,16 @@ uv run python src/saliency/scripts/export_saliency_onnx.py runs/saliency/stage1_
 
 - The package is now split into:
   - shared saliency infrastructure in `config.py`, `engine.py`, `types.py`, `analysis.py`
+  - ROI extraction and GPU preprocessing in `retina.py`
   - strategy implementations in `/src/reading_simulation/strategies/`
+
+- GPU execution:
+  - candidate rescoring and NMS run on GPU with PyTorch tensors
+  - history map residency
+    - the simulation now keeps `history_map` as a device-side `torch.Tensor` during the algorithm flow
+    - it is materialized only when building the final `SimulationResult`
+  - ROI preprocessing
+    - the preprocessing path is fixed to the `wgpu` compute-shader implementation aligned with the web version
 
 - Available strategies:
   - `saliency_only`
@@ -51,6 +60,14 @@ uv run python src/saliency/scripts/export_saliency_onnx.py runs/saliency/stage1_
 ```bash
 python src/run_reading_simulation_demo.py --strategy panel_guided --steps 12
 ```
+
+- Temporary timing instrumentation:
+  - the demo currently prints per-stage timings
+  - `SimulationResult.to_json()` also includes `timing_summary` and `timing_counts`
+  - recent 2-step `panel_guided` run after optimization:
+    - total simulation time: about `0.76s`
+    - candidate rescoring: about `0.04s / ROI`
+    - ROI preprocessing: about `0.07s / ROI`
 
 
 ## Reading Simulation Demo (web)
