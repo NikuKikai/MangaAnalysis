@@ -58,8 +58,12 @@ uv run python src/saliency/scripts/export_saliency_onnx.py runs/saliency/stage1_
 
 - Demo:
 ```bash
-python src/run_reading_simulation_demo.py --strategy panel_guided --steps 12
+python src/run_reading_simulation_demo.py --strategy panel_guided --output-dir samples/reading_simulation_output
 ```
+
+- Demo CLI behavior:
+  - `--output-dir` is the only output target argument; the script writes `panel_guided_result.png/json` or `saliency_only_result.png/json` into that directory
+  - `--steps` is optional; when omitted, the simulation runs until the strategy naturally terminates
 
 - Temporary timing instrumentation:
   - the demo currently prints per-stage timings
@@ -91,11 +95,11 @@ python src/run_reading_simulation_demo.py --strategy panel_guided --steps 12
 
 - Demo:
 ```bash
-python src/run_panel_order_demo.py
+python src/run_panel_order_demo.py --output-dir samples/panel_order_output
 ```
 
 - Output:
-  - `samples/panel_order_result.json`
-  - `samples/panel_order_result.png`
+  - `samples/panel_order_output/panel_order_result.json`
+  - `samples/panel_order_output/panel_order_result.png`
 
 

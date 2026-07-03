@@ -34,8 +34,9 @@ class SaliencyOnlyStrategy:
         roi_size = initial_roi_size if initial_roi_size is not None else self.engine.create_default_roi_size(page_height)
         fixations: list[tuple[float, float]] = [current_fixation]
         step_states: list[StepState] = []
+        step_limit = self.config.steps
 
-        for step_index in range(self.config.steps + 1):
+        for step_index in range(step_limit + 1 if step_limit is not None else 10**9):
             # Update the full-page history map before scoring the next transition.
             add_fixation_to_history(history_map, current_fixation, history_sigma, decay=self.config.history_decay)
 
@@ -77,7 +78,7 @@ class SaliencyOnlyStrategy:
                 )
             )
 
-            if selected_fixation is None or step_index >= self.config.steps:
+            if selected_fixation is None or (step_limit is not None and step_index >= step_limit):
                 break
 
             current_fixation = selected_fixation

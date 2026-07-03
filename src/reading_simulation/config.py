@@ -25,4 +25,4 @@ class SimulationConfig:
     threshold_score: float = field(default=0.15, metadata={"doc": "Absolute minimum final candidate score kept after rescoring."})
     nms_radius_ratio: float = field(default=0.013, metadata={"doc": "Non-maximum suppression radius as a ratio of page height."})
     top_k: int = field(default=8, metadata={"doc": "Maximum number of local saliency peaks to keep per step."})
-    steps: int = field(default=12, metadata={"doc": "Maximum number of transition steps after the initial fixation."})
+    steps: int | None = field(default=12, metadata={"doc": "Optional maximum number of transition steps after the initial fixation."})
