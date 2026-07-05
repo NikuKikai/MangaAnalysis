@@ -15,7 +15,19 @@ type OverlaySvgProps = {
 
 export function OverlaySvg(props: OverlaySvgProps) {
   const { viewportWidth, viewportHeight, imageRect, imageWidth, imageHeight, dragRoi } = props;
-  const { currentRoi, currentFixation, pendingNextFixation, trajectory, candidates, panelBoxes, showPanelBoxes, strategy, panelGuidedAnalysis } = useSimulationStore(
+  const {
+    currentRoi,
+    currentFixation,
+    pendingNextFixation,
+    trajectory,
+    candidates,
+    panelBoxes,
+    showPanelBoxes,
+    showPreprocess,
+    showSelectorOverlay,
+    strategy,
+    panelGuidedAnalysis,
+  } = useSimulationStore(
     useShallow((state) => ({
       currentRoi: state.currentRoi,
       currentFixation: state.currentFixation,
@@ -24,6 +36,8 @@ export function OverlaySvg(props: OverlaySvgProps) {
       candidates: state.candidates,
       panelBoxes: state.panelBoxes,
       showPanelBoxes: state.display.showPanelBoxes,
+      showPreprocess: state.display.showPreprocess,
+      showSelectorOverlay: state.display.showSelectorOverlay,
       strategy: state.strategy,
       panelGuidedAnalysis: state.panelGuidedAnalysis,
     })),
@@ -44,7 +58,7 @@ export function OverlaySvg(props: OverlaySvgProps) {
   }, [trajectoryPoints]);
 
   const candidateDots = useMemo(() => {
-    if (!imageRect || imageWidth <= 0 || imageHeight <= 0) {
+    if (!showSelectorOverlay || !imageRect || imageWidth <= 0 || imageHeight <= 0) {
       return [];
     }
     return candidates.map((candidate, index) => ({
@@ -52,7 +66,7 @@ export function OverlaySvg(props: OverlaySvgProps) {
       alpha: 0.35 + Math.min(0.65, candidate.finalScore),
       point: pagePointToScreen({ x: candidate.pageX, y: candidate.pageY }, imageRect, imageWidth, imageHeight),
     }));
-  }, [candidates, imageHeight, imageRect, imageWidth]);
+  }, [candidates, imageHeight, imageRect, imageWidth, showSelectorOverlay]);
 
   const panelBoxRects = useMemo(() => {
     if (!showPanelBoxes || !imageRect || imageWidth <= 0 || imageHeight <= 0) {
@@ -66,11 +80,11 @@ export function OverlaySvg(props: OverlaySvgProps) {
   }, [imageHeight, imageRect, imageWidth, panelBoxes, showPanelBoxes]);
 
   const currentRoiRect = useMemo(() => {
-    if (!imageRect || !currentRoi || imageWidth <= 0 || imageHeight <= 0) {
+    if (!showPreprocess || !imageRect || !currentRoi || imageWidth <= 0 || imageHeight <= 0) {
       return null;
     }
     return roiToScreenRect(currentRoi, imageRect, imageWidth, imageHeight);
-  }, [currentRoi, imageHeight, imageRect, imageWidth]);
+  }, [currentRoi, imageHeight, imageRect, imageWidth, showPreprocess]);
 
   const dragRoiRect = useMemo(() => {
     if (!imageRect || !dragRoi || imageWidth <= 0 || imageHeight <= 0) {
@@ -94,7 +108,7 @@ export function OverlaySvg(props: OverlaySvgProps) {
   }, [imageHeight, imageRect, imageWidth, pendingNextFixation]);
 
   const bestCandidateArrow = useMemo(() => {
-    if (strategy !== "saliency_only") {
+    if (!showSelectorOverlay || strategy !== "saliency_only") {
       return null;
     }
     if (!currentFixationPoint || !pendingFixationPoint) {
@@ -122,10 +136,10 @@ export function OverlaySvg(props: OverlaySvgProps) {
       x2: endX,
       y2: endY,
     };
-  }, [currentFixationPoint, pendingFixationPoint, strategy]);
+  }, [currentFixationPoint, pendingFixationPoint, showSelectorOverlay, strategy]);
 
   const fluidityArrows = useMemo(() => {
-    if (strategy !== "panel_guided" || !imageRect || imageWidth <= 0 || imageHeight <= 0 || !panelGuidedAnalysis) {
+    if (!showSelectorOverlay || strategy !== "panel_guided" || !imageRect || imageWidth <= 0 || imageHeight <= 0 || !panelGuidedAnalysis) {
       return [];
     }
 
@@ -146,12 +160,12 @@ export function OverlaySvg(props: OverlaySvgProps) {
         {
           ...arrow,
           id: `fluidity-${step.stepIndex}`,
-          color: step.strongerThanActualNext ? "rgba(255, 72, 72, 0.96)" : "rgba(255, 192, 0, 0.96)",
+          color: step.strongerThanActualNext ? "rgba(255, 72, 72, 0.42)" : "rgba(255, 192, 0, 0.42)",
           width: arrow.width,
         },
       ];
     });
-  }, [imageHeight, imageRect, imageWidth, panelGuidedAnalysis, strategy, trajectory]);
+  }, [imageHeight, imageRect, imageWidth, panelGuidedAnalysis, showSelectorOverlay, strategy, trajectory]);
 
   return (
     <svg
@@ -193,6 +207,29 @@ export function OverlaySvg(props: OverlaySvgProps) {
         </g>
       ))}
 
+      {fluidityArrows.map((arrow) => (
+        <g key={arrow.id}>
+          <line
+            className="overlay-fluidity-arrow-shadow"
+            x1={arrow.x1}
+            y1={arrow.y1}
+            x2={arrow.x2}
+            y2={arrow.y2}
+            strokeWidth={arrow.width + 4}
+          />
+          <line
+            x1={arrow.x1}
+            y1={arrow.y1}
+            x2={arrow.x2}
+            y2={arrow.y2}
+            stroke={arrow.color}
+            strokeWidth={arrow.width}
+            strokeLinecap="round"
+          />
+          <polygon points={arrow.headPoints} fill={arrow.color} />
+        </g>
+      ))}
+
       {trajectoryPath ? (
         <>
           <path className="overlay-history-shadow" d={trajectoryPath} />
@@ -219,29 +256,6 @@ export function OverlaySvg(props: OverlaySvgProps) {
           />
         </>
       ) : null}
-
-      {fluidityArrows.map((arrow) => (
-        <g key={arrow.id}>
-          <line
-            className="overlay-fluidity-arrow-shadow"
-            x1={arrow.x1}
-            y1={arrow.y1}
-            x2={arrow.x2}
-            y2={arrow.y2}
-            strokeWidth={arrow.width + 4}
-          />
-          <line
-            x1={arrow.x1}
-            y1={arrow.y1}
-            x2={arrow.x2}
-            y2={arrow.y2}
-            stroke={arrow.color}
-            strokeWidth={arrow.width}
-            strokeLinecap="round"
-          />
-          <polygon points={arrow.headPoints} fill={arrow.color} />
-        </g>
-      ))}
 
       {trajectoryPoints.map((point, index) => (
         <g key={`fixation-history-${index}`}>

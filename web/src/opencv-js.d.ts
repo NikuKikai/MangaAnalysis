@@ -1,4 +1,4 @@
-type OpenCvApi = {
+export type OpenCvApi = {
   onRuntimeInitialized?: (() => void) | null;
   [key: string]: unknown;
 };
@@ -11,5 +11,3 @@ declare global {
     };
   }
 }
-
-export {};

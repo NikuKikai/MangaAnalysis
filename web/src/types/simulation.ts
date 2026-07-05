@@ -17,6 +17,7 @@ export type DisplayState = {
   showHeatmap: boolean;
   showHistoryHeatmap: boolean;
   showPanelBoxes: boolean;
+  showSelectorOverlay: boolean;
 };
 
 export type SimulationSettings = {

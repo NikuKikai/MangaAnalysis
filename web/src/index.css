@@ -149,7 +149,7 @@ svg {
 }
 
 .overlay-fluidity-arrow-shadow {
-  stroke: rgba(0, 0, 0, 0.5);
+  stroke: rgba(0, 0, 0, 0.28);
   stroke-linecap: round;
 }
 
@@ -349,6 +349,46 @@ svg {
   flex-direction: column;
   align-items: stretch;
   gap: 9px;
+}
+
+.panel-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+}
+
+.menu-anchor {
+  position: relative;
+}
+
+.panel-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 112px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(8, 10, 12, 0.98);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.34);
+}
+
+.panel-menu-item {
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(244, 246, 248, 0.92);
+  text-align: left;
+  cursor: pointer;
+}
+
+.panel-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .panel-toolbar {

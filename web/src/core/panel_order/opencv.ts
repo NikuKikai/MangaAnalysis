@@ -1,3 +1,5 @@
+import type { OpenCvApi } from "../../opencv-js";
+
 const OPENCV_CDN_URL = "https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.11.0-release.1/dist/opencv.js";
 
 let cvPromise: Promise<OpenCvApi> | null = null;

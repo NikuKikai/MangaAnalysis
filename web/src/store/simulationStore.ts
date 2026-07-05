@@ -32,6 +32,7 @@ const defaultDisplay: DisplayState = {
   showHeatmap: true,
   showHistoryHeatmap: false,
   showPanelBoxes: true,
+  showSelectorOverlay: true,
 };
 
 type SimulationStore = {

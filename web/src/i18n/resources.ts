@@ -29,6 +29,8 @@ export const resources = {
           nextStep: "Next Step",
           reset: "Reset",
           information: "Information",
+          languageMenu: "Open Language Menu",
+          save: "Save Visualization",
           expand: "Expand Panel",
           collapse: "Collapse Panel",
           saliencyOnlyStrategy: "Saliency",
@@ -37,6 +39,7 @@ export const resources = {
           togglePreprocess: "Toggle Preprocess View",
           toggleSaliency: "Toggle Saliency View",
           toggleHistory: "Toggle History View",
+          toggleSelector: "Toggle Candidate Overlay",
         },
         info: {
           dialogLabel: "Information",
@@ -136,6 +139,8 @@ export const resources = {
           nextStep: "次へ",
           reset: "リセット",
           information: "情報",
+          languageMenu: "言語メニューを開く",
+          save: "可視化結果を保存",
           expand: "パネルを展開",
           collapse: "パネルを折りたたむ",
           saliencyOnlyStrategy: "Saliency",
@@ -144,6 +149,7 @@ export const resources = {
           togglePreprocess: "Preprocess 表示の切り替え",
           toggleSaliency: "Saliency 表示の切り替え",
           toggleHistory: "History 表示の切り替え",
+          toggleSelector: "候補 overlay の切り替え",
         },
         info: {
           dialogLabel: "情報",

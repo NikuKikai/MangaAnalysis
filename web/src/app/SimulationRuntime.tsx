@@ -42,6 +42,11 @@ type SimulationEngineContextValue = {
     preprocessCanvasRef: RefObject<HTMLCanvasElement>;
     heatmapCanvasRef: RefObject<HTMLCanvasElement>;
   };
+  exportBuffers: {
+    preprocessPreview: Float32Array | null;
+    heatmap: Float32Array | null;
+    modelSize: number;
+  };
   overlay: {
     viewportWidth: number;
     viewportHeight: number;
@@ -101,6 +106,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const initStartedRef = useRef(false);
+  const preprocessPreviewRef = useRef<Float32Array | null>(null);
+  const heatmapRef = useRef<Float32Array | null>(null);
   const [imageRect, setImageRect] = useState<ImageRect | null>(null);
 
   // Read store fields individually so each dependency stays explicit at call sites.
@@ -155,6 +162,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   // Recompute the fitted image rectangle whenever the viewport or image changes.
   useEffect(() => {
     if (!image) {
+      preprocessPreviewRef.current = null;
+      heatmapRef.current = null;
       setImageRect(null);
       return;
     }
@@ -195,7 +204,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       engineRef.current.historyRenderer.initialize(image.width, image.height);
       renderHistoryOverlay(engineRef.current, imageRect);
     }
-  }, [image, imageRect, display.showHistoryHeatmap]);
+  }, [image, imageRect]);
 
   // Detect panel boxes whenever a new page image is loaded so the overlay can visualize them immediately.
   useEffect(() => {
@@ -253,7 +262,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     engine.historyMapHeight = image.height;
     engine.historyRenderer.initialize(image.width, image.height);
     renderHistoryOverlay(engine, imageRect);
-  }, [image, imageRect, trajectory.length, currentRoi, currentFixation, pendingNextFixation, display.showHistoryHeatmap]);
+  }, [image, imageRect, trajectory.length, currentRoi, currentFixation, pendingNextFixation]);
 
   // Keep the GPU overlay canvases sized to the current viewport in physical pixels.
   useEffect(() => {
@@ -371,8 +380,10 @@ export function SimulationProvider({ children }: PropsWithChildren) {
 
   const runStepOnce = async (engine: Engine, imageResource: ImageResource, roi: RoiRect, fixation: Point) => {
     const input = await engine.preprocessor.run(roi, fixation, imageResource.height, settings);
+    preprocessPreviewRef.current = input;
     engine.preprocessRenderer.updatePreview(input, modelSize());
     const heatmap = await engine.session.predict(input);
+    heatmapRef.current = heatmap;
     const nmsRadius = Math.max(1, Math.round((imageResource.height * settings.nmsRadiusRatio * modelSize()) / roi.size));
     const distanceSigma = Math.max(1, imageResource.height * settings.distanceSigmaRatio);
     engine.heatmapRenderer.updateHeatmap(heatmap, modelSize());
@@ -397,8 +408,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     };
   };
 
-  // Run one saliency-only step: update global history, score the local ROI, then fall back to the full page if needed.
-  const runSaliencyOnlyStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
+  // Run one saliency-only step: optionally reset history for a fresh start, then score the ROI.
+  const runSaliencyOnlyStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], resetHistory: boolean) => {
     const engine = engineRef.current;
     if (!engine || !image) {
       return;
@@ -406,6 +417,9 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
       engine.historyMapWidth = image.width;
       engine.historyMapHeight = image.height;
+      engine.historyRenderer.initialize(image.width, image.height);
+    }
+    if (resetHistory) {
       engine.historyRenderer.initialize(image.width, image.height);
     }
     engine.historyRenderer.accumulateFixation(
@@ -438,8 +452,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     });
   };
 
-  // Run one panel-guided step: write history inside the active panel, then apply the panel-order transition rules.
-  const runPanelGuidedStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], stepIndex: number) => {
+  // Run one panel-guided step: optionally reset history for a fresh start, then apply panel-order rules.
+  const runPanelGuidedStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], stepIndex: number, resetHistory: boolean) => {
     const engine = engineRef.current;
     if (!engine || !image || orderedPanels.length === 0) {
       return;
@@ -448,6 +462,9 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
       engine.historyMapWidth = image.width;
       engine.historyMapHeight = image.height;
+      engine.historyRenderer.initialize(image.width, image.height);
+    }
+    if (resetHistory) {
       engine.historyRenderer.initialize(image.width, image.height);
     }
 
@@ -510,12 +527,12 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   };
 
   // Dispatch one step to the active strategy implementation.
-  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
+  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], resetHistory: boolean) => {
     if (strategy === "panel_guided") {
-      await runPanelGuidedStep(initialRoi, fixation, committedTrajectory, committedTrajectory.length - 1);
+      await runPanelGuidedStep(initialRoi, fixation, committedTrajectory, committedTrajectory.length - 1, resetHistory);
       return;
     }
-    await runSaliencyOnlyStep(initialRoi, fixation, committedTrajectory);
+    await runSaliencyOnlyStep(initialRoi, fixation, committedTrajectory, resetHistory);
   };
 
   // Start a click-driven step using the configured square ROI around the click point.
@@ -525,13 +542,13 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     }
     const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(point, halfSize);
-    await runStep(roi, point, [point]);
+    await runStep(roi, point, [point], true);
   };
 
   // Start a box-driven step using the user-drawn ROI and its center as fixation.
   const startBoxStep = async (roi: RoiRect) => {
     const fixation = roiCenter(roi);
-    await runStep(roi, fixation, [fixation]);
+    await runStep(roi, fixation, [fixation], true);
   };
 
   // Continue the trajectory from the pending fixation chosen in the previous step.
@@ -541,7 +558,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     }
     const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(pendingNextFixation, halfSize);
-    await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation]);
+    await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation], false);
   };
 
   // Expose rendering refs plus interaction entry points to the stage and controls.
@@ -551,6 +568,11 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       historyCanvasRef,
       preprocessCanvasRef,
       heatmapCanvasRef,
+    },
+    exportBuffers: {
+      preprocessPreview: preprocessPreviewRef.current,
+      heatmap: heatmapRef.current,
+      modelSize: modelSize(),
     },
     overlay: {
       viewportWidth: viewport.width,
