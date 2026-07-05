@@ -31,8 +31,6 @@ type Engine = {
   preprocessRenderer: PreprocessRenderer;
   candidateSelector: GpuCandidateSelector;
   session: SaliencySession;
-  historyMapWidth: number;
-  historyMapHeight: number;
 };
 
 type SimulationEngineContextValue = {
@@ -91,8 +89,6 @@ async function createEngine(
     preprocessRenderer,
     candidateSelector,
     session,
-    historyMapWidth: 0,
-    historyMapHeight: 0,
   };
 }
 
@@ -199,8 +195,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (image && engineRef.current) {
       engineRef.current.preprocessor.setSourceImage(image.bitmap);
-      engineRef.current.historyMapWidth = image.width;
-      engineRef.current.historyMapHeight = image.height;
       engineRef.current.historyRenderer.initialize(image.width, image.height);
       renderHistoryOverlay(engineRef.current, imageRect);
     }
@@ -258,8 +252,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     ) {
       return;
     }
-    engine.historyMapWidth = image.width;
-    engine.historyMapHeight = image.height;
     engine.historyRenderer.initialize(image.width, image.height);
     renderHistoryOverlay(engine, imageRect);
   }, [image, imageRect, trajectory.length, currentRoi, currentFixation, pendingNextFixation]);
@@ -397,8 +389,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       imageWidth: imageResource.width,
       imageHeight: imageResource.height,
       currentFixation: fixation,
-      historyMapWidth: engine.historyMapWidth,
-      historyMapHeight: engine.historyMapHeight,
+      historyMapWidth: imageResource.width,
+      historyMapHeight: imageResource.height,
       historyAlpha: settings.historyAlpha,
       distanceSigma,
     });
@@ -413,11 +405,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     const engine = engineRef.current;
     if (!engine || !image) {
       return;
-    }
-    if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
-      engine.historyMapWidth = image.width;
-      engine.historyMapHeight = image.height;
-      engine.historyRenderer.initialize(image.width, image.height);
     }
     engine.historyRenderer.accumulateFixation(
       fixation.x,
@@ -454,12 +441,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     const engine = engineRef.current;
     if (!engine || !image || orderedPanels.length === 0) {
       return;
-    }
-
-    if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
-      engine.historyMapWidth = image.width;
-      engine.historyMapHeight = image.height;
-      engine.historyRenderer.initialize(image.width, image.height);
     }
 
     const currentPanelIndex =
@@ -535,8 +516,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!image || !engine) {
       return;
     }
-    engine.historyMapWidth = image.width;
-    engine.historyMapHeight = image.height;
     engine.historyRenderer.initialize(image.width, image.height);
     renderHistoryOverlay(engine, imageRect);
     const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
@@ -550,8 +529,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!image || !engine) {
       return;
     }
-    engine.historyMapWidth = image.width;
-    engine.historyMapHeight = image.height;
     engine.historyRenderer.initialize(image.width, image.height);
     renderHistoryOverlay(engine, imageRect);
     const fixation = roiCenter(roi);
