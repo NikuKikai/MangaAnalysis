@@ -41,6 +41,11 @@ export function SimulationStage() {
     if (!point) {
       return;
     }
+    // Click mode should commit immediately on press instead of waiting for a later pointer-up event.
+    if (mode === "click") {
+      void startClickStep(point);
+      return;
+    }
     if (mode === "box") {
       setDragState(point, point, true);
     }
@@ -61,11 +66,6 @@ export function SimulationStage() {
     const point = getPagePoint(event.clientX, event.clientY);
     if (!point) {
       setDragState(null, null, false);
-      return;
-    }
-
-    if (mode === "click") {
-      void startClickStep(point);
       return;
     }
 
