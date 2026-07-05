@@ -40,7 +40,7 @@ export function drawExportOverlays(
     }
   }
 
-  if (display.showSelectorOverlay && strategy === "saliency_only" && currentFixation && pendingNextFixation) {
+  if (display.showSelectorOverlay && currentFixation && pendingNextFixation) {
     drawDashedArrow(context, currentFixation, pendingNextFixation, {
       stroke: "rgba(255, 214, 138, 0.48)",
       shadowStroke: "rgba(0, 0, 0, 0.32)",

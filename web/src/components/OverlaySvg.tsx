@@ -108,7 +108,7 @@ export function OverlaySvg(props: OverlaySvgProps) {
   }, [imageHeight, imageRect, imageWidth, pendingNextFixation]);
 
   const bestCandidateArrow = useMemo(() => {
-    if (!showSelectorOverlay || strategy !== "saliency_only") {
+    if (!showSelectorOverlay) {
       return null;
     }
     if (!currentFixationPoint || !pendingFixationPoint) {
@@ -136,7 +136,7 @@ export function OverlaySvg(props: OverlaySvgProps) {
       x2: endX,
       y2: endY,
     };
-  }, [currentFixationPoint, pendingFixationPoint, showSelectorOverlay, strategy]);
+  }, [currentFixationPoint, pendingFixationPoint, showSelectorOverlay]);
 
   const fluidityArrows = useMemo(() => {
     if (!showSelectorOverlay || strategy !== "panel_guided" || !imageRect || imageWidth <= 0 || imageHeight <= 0 || !panelGuidedAnalysis) {
