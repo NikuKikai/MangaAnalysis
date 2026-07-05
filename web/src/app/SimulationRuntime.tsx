@@ -408,8 +408,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     };
   };
 
-  // Run one saliency-only step: optionally reset history for a fresh start, then score the ROI.
-  const runSaliencyOnlyStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], resetHistory: boolean) => {
+  // Run one saliency-only step: update history, score the ROI, then fall back to the full page if needed.
+  const runSaliencyOnlyStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
     const engine = engineRef.current;
     if (!engine || !image) {
       return;
@@ -417,9 +417,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
       engine.historyMapWidth = image.width;
       engine.historyMapHeight = image.height;
-      engine.historyRenderer.initialize(image.width, image.height);
-    }
-    if (resetHistory) {
       engine.historyRenderer.initialize(image.width, image.height);
     }
     engine.historyRenderer.accumulateFixation(
@@ -452,8 +449,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     });
   };
 
-  // Run one panel-guided step: optionally reset history for a fresh start, then apply panel-order rules.
-  const runPanelGuidedStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], stepIndex: number, resetHistory: boolean) => {
+  // Run one panel-guided step: write history inside the active panel, then apply panel-order rules.
+  const runPanelGuidedStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], stepIndex: number) => {
     const engine = engineRef.current;
     if (!engine || !image || orderedPanels.length === 0) {
       return;
@@ -462,9 +459,6 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (engine.historyMapWidth !== image.width || engine.historyMapHeight !== image.height) {
       engine.historyMapWidth = image.width;
       engine.historyMapHeight = image.height;
-      engine.historyRenderer.initialize(image.width, image.height);
-    }
-    if (resetHistory) {
       engine.historyRenderer.initialize(image.width, image.height);
     }
 
@@ -527,28 +521,41 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   };
 
   // Dispatch one step to the active strategy implementation.
-  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[], resetHistory: boolean) => {
+  const runStep = async (initialRoi: RoiRect, fixation: Point, committedTrajectory: Point[]) => {
     if (strategy === "panel_guided") {
-      await runPanelGuidedStep(initialRoi, fixation, committedTrajectory, committedTrajectory.length - 1, resetHistory);
+      await runPanelGuidedStep(initialRoi, fixation, committedTrajectory, committedTrajectory.length - 1);
       return;
     }
-    await runSaliencyOnlyStep(initialRoi, fixation, committedTrajectory, resetHistory);
+    await runSaliencyOnlyStep(initialRoi, fixation, committedTrajectory);
   };
 
   // Start a click-driven step using the configured square ROI around the click point.
   const startClickStep = async (point: Point) => {
-    if (!image) {
+    const engine = engineRef.current;
+    if (!image || !engine) {
       return;
     }
+    engine.historyMapWidth = image.width;
+    engine.historyMapHeight = image.height;
+    engine.historyRenderer.initialize(image.width, image.height);
+    renderHistoryOverlay(engine, imageRect);
     const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(point, halfSize);
-    await runStep(roi, point, [point], true);
+    await runStep(roi, point, [point]);
   };
 
   // Start a box-driven step using the user-drawn ROI and its center as fixation.
   const startBoxStep = async (roi: RoiRect) => {
+    const engine = engineRef.current;
+    if (!image || !engine) {
+      return;
+    }
+    engine.historyMapWidth = image.width;
+    engine.historyMapHeight = image.height;
+    engine.historyRenderer.initialize(image.width, image.height);
+    renderHistoryOverlay(engine, imageRect);
     const fixation = roiCenter(roi);
-    await runStep(roi, fixation, [fixation], true);
+    await runStep(roi, fixation, [fixation]);
   };
 
   // Continue the trajectory from the pending fixation chosen in the previous step.
@@ -558,7 +565,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     }
     const halfSize = image.height * settings.defaultRoiHalfSizeRatio;
     const roi = createCenteredSquareRoi(pendingNextFixation, halfSize);
-    await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation], false);
+    await runStep(roi, pendingNextFixation, [...trajectory, pendingNextFixation]);
   };
 
   // Expose rendering refs plus interaction entry points to the stage and controls.
