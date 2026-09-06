@@ -56,6 +56,7 @@ export async function exportVisualization({
   if (!image || !overlay.imageRect) {
     return;
   }
+  const imageRect = overlay.imageRect;
 
   const stageElement = document.querySelector(".canvas-stack") as HTMLElement | null;
   if (!stageElement) {
@@ -71,10 +72,10 @@ export async function exportVisualization({
 
   const scaleX = stageCapture.width / Math.max(overlay.viewportWidth, 1);
   const scaleY = stageCapture.height / Math.max(overlay.viewportHeight, 1);
-  const cropX = Math.round(overlay.imageRect.x * scaleX);
-  const cropY = Math.round(overlay.imageRect.y * scaleY);
-  const cropWidth = Math.max(1, Math.round(overlay.imageRect.width * scaleX));
-  const cropHeight = Math.max(1, Math.round(overlay.imageRect.height * scaleY));
+  const cropX = Math.round(imageRect.x * scaleX);
+  const cropY = Math.round(imageRect.y * scaleY);
+  const cropWidth = Math.max(1, Math.round(imageRect.width * scaleX));
+  const cropHeight = Math.max(1, Math.round(imageRect.height * scaleY));
 
   const exportCanvas = document.createElement("canvas");
   exportCanvas.width = cropWidth;
@@ -92,10 +93,10 @@ export async function exportVisualization({
     }
     const sourceScaleX = sourceCanvas.width / Math.max(overlay.viewportWidth, 1);
     const sourceScaleY = sourceCanvas.height / Math.max(overlay.viewportHeight, 1);
-    const sx = Math.round(overlay.imageRect.x * sourceScaleX);
-    const sy = Math.round(overlay.imageRect.y * sourceScaleY);
-    const sw = Math.max(1, Math.round(overlay.imageRect.width * sourceScaleX));
-    const sh = Math.max(1, Math.round(overlay.imageRect.height * sourceScaleY));
+    const sx = Math.round(imageRect.x * sourceScaleX);
+    const sy = Math.round(imageRect.y * sourceScaleY);
+    const sw = Math.max(1, Math.round(imageRect.width * sourceScaleX));
+    const sh = Math.max(1, Math.round(imageRect.height * sourceScaleY));
     context.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, cropWidth, cropHeight);
   };
 
