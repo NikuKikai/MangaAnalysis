@@ -7,7 +7,7 @@ import { OverlaySvg } from "./OverlaySvg";
 
 export function SimulationStage() {
   const {
-    refs: { baseCanvasRef, historyCanvasRef, preprocessCanvasRef, heatmapCanvasRef },
+    refs: { baseCanvasRef, historyCanvasRef, preprocessCanvasRef, heatmapCanvasRef, maskCanvasRef },
     overlay,
     interactionState,
     startClickStep,
@@ -94,6 +94,7 @@ export function SimulationStage() {
         <canvas ref={baseCanvasRef} className="stage-canvas" />
         <canvas ref={preprocessCanvasRef} className="stage-canvas preprocess-layer" />
         <canvas ref={heatmapCanvasRef} className="stage-canvas heatmap-layer" />
+        <canvas ref={maskCanvasRef} className="stage-canvas mask-layer" />
         <canvas ref={historyCanvasRef} className="stage-canvas history-layer" />
         <OverlaySvg {...overlay} />
       </div>

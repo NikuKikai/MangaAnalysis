@@ -11,6 +11,7 @@ export type RoiRect = {
 
 export type MouseMode = "click" | "box";
 export type SimulationStrategy = "saliency_only" | "panel_guided";
+export type HistoryMode = "gaussian" | "mask";
 
 export type DisplayState = {
   showPreprocess: boolean;
@@ -18,6 +19,7 @@ export type DisplayState = {
   showHistoryHeatmap: boolean;
   showPanelBoxes: boolean;
   showSelectorOverlay: boolean;
+  showEdgeSamMask: boolean;
 };
 
 export type SimulationSettings = {
@@ -31,6 +33,7 @@ export type SimulationSettings = {
   thresholdRatio: number;
   nmsRadiusRatio: number;
   topK: number;
+  historyMode: HistoryMode;
 };
 
 export type Candidate = {

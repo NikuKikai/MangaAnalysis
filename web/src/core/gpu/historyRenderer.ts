@@ -46,6 +46,33 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 `;
 
+const HISTORY_MASK_ACCUMULATE_SHADER = /* wgsl */ `
+struct MaskAccumulateParams {
+  map_width: u32,
+  map_height: u32,
+  decay: f32,
+  _padding: f32,
+};
+
+@group(0) @binding(0) var<storage, read_write> history_map: array<f32>;
+@group(0) @binding(1) var<storage, read> mask_map: array<f32>;
+@group(0) @binding(2) var<uniform> params: MaskAccumulateParams;
+
+fn history_index(x: u32, y: u32) -> u32 {
+  return y * params.map_width + x;
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+  if (id.x >= params.map_width || id.y >= params.map_height) {
+    return;
+  }
+
+  let index = history_index(id.x, id.y);
+  history_map[index] = history_map[index] * params.decay + mask_map[index];
+}
+`;
+
 const HISTORY_SHADER = /* wgsl */ `
 struct Uniforms {
   viewport_width: f32,
@@ -149,14 +176,19 @@ export class HistoryRenderer {
   private readonly context: GPUCanvasContext;
   private readonly format: GPUTextureFormat;
   private readonly accumulatePipeline: GPUComputePipeline;
+  private readonly maskAccumulatePipeline: GPUComputePipeline;
   private readonly pipeline: GPURenderPipeline;
   private readonly accumulateUniformBuffer: GPUBuffer;
+  private readonly maskAccumulateUniformBuffer: GPUBuffer;
+  private maskBuffer: GPUBuffer;
   private readonly uniformBuffer: GPUBuffer;
   private readonly bindGroupLayout: GPUBindGroupLayout;
   private readonly accumulateBindGroupLayout: GPUBindGroupLayout;
+  private readonly maskAccumulateBindGroupLayout: GPUBindGroupLayout;
   private historyBuffer: GPUBuffer;
   private bindGroup: GPUBindGroup;
   private accumulateBindGroup: GPUBindGroup;
+  private maskAccumulateBindGroup: GPUBindGroup;
   private mapWidth = 0;
   private mapHeight = 0;
   private canvasWidth = 0;
@@ -186,6 +218,20 @@ export class HistoryRenderer {
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.accumulateBindGroupLayout] }),
       compute: {
         module: device.createShaderModule({ code: HISTORY_ACCUMULATE_SHADER }),
+        entryPoint: "main",
+      },
+    });
+    this.maskAccumulateBindGroupLayout = device.createBindGroupLayout({
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: "storage" } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: "read-only-storage" } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: "uniform" } },
+      ],
+    });
+    this.maskAccumulatePipeline = device.createComputePipeline({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [this.maskAccumulateBindGroupLayout] }),
+      compute: {
+        module: device.createShaderModule({ code: HISTORY_MASK_ACCUMULATE_SHADER }),
         entryPoint: "main",
       },
     });
@@ -230,6 +276,10 @@ export class HistoryRenderer {
       size: 48,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    this.maskAccumulateUniformBuffer = device.createBuffer({
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
     this.uniformBuffer = device.createBuffer({
       size: 64,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -238,8 +288,13 @@ export class HistoryRenderer {
       size: 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     });
+    this.maskBuffer = device.createBuffer({
+      size: 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
     this.bindGroup = this.createBindGroup();
     this.accumulateBindGroup = this.createAccumulateBindGroup();
+    this.maskAccumulateBindGroup = this.createMaskAccumulateBindGroup();
   }
 
   private createBindGroup(): GPUBindGroup {
@@ -258,6 +313,17 @@ export class HistoryRenderer {
       entries: [
         { binding: 0, resource: { buffer: this.historyBuffer } },
         { binding: 1, resource: { buffer: this.accumulateUniformBuffer } },
+      ],
+    });
+  }
+
+  private createMaskAccumulateBindGroup(): GPUBindGroup {
+    return this.device.createBindGroup({
+      layout: this.maskAccumulateBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.historyBuffer } },
+        { binding: 1, resource: { buffer: this.maskBuffer } },
+        { binding: 2, resource: { buffer: this.maskAccumulateUniformBuffer } },
       ],
     });
   }
@@ -283,6 +349,15 @@ export class HistoryRenderer {
       });
       this.bindGroup = this.createBindGroup();
       this.accumulateBindGroup = this.createAccumulateBindGroup();
+      this.maskAccumulateBindGroup = this.createMaskAccumulateBindGroup();
+    }
+    if (this.maskBuffer.size < byteLength) {
+      this.maskBuffer.destroy();
+      this.maskBuffer = this.device.createBuffer({
+        size: byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      this.maskAccumulateBindGroup = this.createMaskAccumulateBindGroup();
     }
     this.device.queue.writeBuffer(this.historyBuffer, 0, new Float32Array(width * height));
   }
@@ -311,6 +386,32 @@ export class HistoryRenderer {
     const pass = encoder.beginComputePass();
     pass.setPipeline(this.accumulatePipeline);
     pass.setBindGroup(0, this.accumulateBindGroup);
+    pass.dispatchWorkgroups(Math.ceil(this.mapWidth / 8), Math.ceil(this.mapHeight / 8), 1);
+    pass.end();
+    this.device.queue.submit([encoder.finish()]);
+  }
+
+  accumulateMask(mask: Uint8Array, decay: number): void {
+    if (this.mapWidth <= 0 || this.mapHeight <= 0 || mask.length !== this.mapWidth * this.mapHeight) {
+      return;
+    }
+    const maskValues = new Float32Array(mask.length);
+    for (let index = 0; index < mask.length; index += 1) {
+      maskValues[index] = mask[index] > 0 ? 1 : 0;
+    }
+    this.device.queue.writeBuffer(this.maskBuffer, 0, maskValues);
+
+    const uniformBytes = new ArrayBuffer(16);
+    const view = new DataView(uniformBytes);
+    view.setUint32(0, this.mapWidth, true);
+    view.setUint32(4, this.mapHeight, true);
+    view.setFloat32(8, Math.min(0.999, Math.max(0, decay)), true);
+    this.device.queue.writeBuffer(this.maskAccumulateUniformBuffer, 0, uniformBytes);
+
+    const encoder = this.device.createCommandEncoder();
+    const pass = encoder.beginComputePass();
+    pass.setPipeline(this.maskAccumulatePipeline);
+    pass.setBindGroup(0, this.maskAccumulateBindGroup);
     pass.dispatchWorkgroups(Math.ceil(this.mapWidth / 8), Math.ceil(this.mapHeight / 8), 1);
     pass.end();
     this.device.queue.submit([encoder.finish()]);

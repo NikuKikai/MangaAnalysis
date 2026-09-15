@@ -25,6 +25,7 @@ const defaultSettings: SimulationSettings = {
   thresholdRatio: 0.15,
   nmsRadiusRatio: 0.013,
   topK: 8,
+  historyMode: "gaussian",
 };
 
 const defaultDisplay: DisplayState = {
@@ -33,6 +34,7 @@ const defaultDisplay: DisplayState = {
   showHistoryHeatmap: false,
   showPanelBoxes: true,
   showSelectorOverlay: true,
+  showEdgeSamMask: true,
 };
 
 type SimulationStore = {

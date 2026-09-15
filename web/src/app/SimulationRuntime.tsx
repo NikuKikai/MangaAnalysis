@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren, type RefObject } from "react";
 import { GpuCandidateSelector } from "../core/gpu/candidateSelector";
+import { EdgeSamPreprocessor } from "../core/gpu/edgeSamPreprocess";
 import { HeatmapRenderer } from "../core/gpu/heatmapRenderer";
 import { HistoryRenderer } from "../core/gpu/historyRenderer";
 import { modelSize, RoiPreprocessor } from "../core/gpu/preprocess";
 import { PreprocessRenderer } from "../core/gpu/preprocessRenderer";
+import { EdgeSamSession } from "../core/onnx/edgeSamSession";
 import { SaliencySession } from "../core/onnx/saliencySession";
 import { analyzePanels } from "../core/panel_order/detector";
 import { analyzeFluidityStep, summarizeFluidity } from "../core/strategies/analysis";
@@ -20,17 +22,20 @@ import {
   type ImageRect,
 } from "../core/utils/roi";
 import { useSimulationStore } from "../store/simulationStore";
+import type { EdgeSamMask } from "../core/onnx/edgeSamTypes";
 import type { Candidate, ImageResource, PanelBox, Point, RoiRect } from "../types/simulation";
 import { useViewportSize } from "./useViewportSize";
 
 type Engine = {
   device: GPUDevice;
   preprocessor: RoiPreprocessor;
+  edgeSamPreprocessor: EdgeSamPreprocessor;
   heatmapRenderer: HeatmapRenderer;
   historyRenderer: HistoryRenderer;
   preprocessRenderer: PreprocessRenderer;
   candidateSelector: GpuCandidateSelector;
   session: SaliencySession;
+  edgeSamSession: EdgeSamSession;
 };
 
 type SimulationEngineContextValue = {
@@ -39,6 +44,7 @@ type SimulationEngineContextValue = {
     historyCanvasRef: RefObject<HTMLCanvasElement>;
     preprocessCanvasRef: RefObject<HTMLCanvasElement>;
     heatmapCanvasRef: RefObject<HTMLCanvasElement>;
+    maskCanvasRef: RefObject<HTMLCanvasElement>;
   };
   exportBuffers: {
     preprocessPreview: Float32Array | null;
@@ -76,19 +82,23 @@ async function createEngine(
   }
   const device = await adapter.requestDevice();
   const preprocessor = new RoiPreprocessor(device);
+  const edgeSamPreprocessor = new EdgeSamPreprocessor(device);
   const heatmapRenderer = new HeatmapRenderer(device, heatmapCanvas);
   const historyRenderer = new HistoryRenderer(device, historyCanvas);
   const preprocessRenderer = new PreprocessRenderer(device, preprocessCanvas);
   const candidateSelector = new GpuCandidateSelector(device);
   const session = await SaliencySession.create();
+  const edgeSamSession = await EdgeSamSession.create();
   return {
     device,
     preprocessor,
+    edgeSamPreprocessor,
     heatmapRenderer,
     historyRenderer,
     preprocessRenderer,
     candidateSelector,
     session,
+    edgeSamSession,
   };
 }
 
@@ -100,10 +110,13 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const historyCanvasRef = useRef<HTMLCanvasElement>(null);
   const preprocessCanvasRef = useRef<HTMLCanvasElement>(null);
   const heatmapCanvasRef = useRef<HTMLCanvasElement>(null);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const initStartedRef = useRef(false);
+  const edgeSamImageTokenRef = useRef(0);
   const preprocessPreviewRef = useRef<Float32Array | null>(null);
   const heatmapRef = useRef<Float32Array | null>(null);
+  const edgeSamMaskRef = useRef<EdgeSamMask | null>(null);
   const [imageRect, setImageRect] = useState<ImageRect | null>(null);
 
   // Read store fields individually so each dependency stays explicit at call sites.
@@ -129,6 +142,90 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const setPanelDetection = useSimulationStore((state) => state.setPanelDetection);
   const setWebgpuAvailable = useSimulationStore((state) => state.setWebgpuAvailable);
   const applyStepOutcome = useSimulationStore((state) => state.applyStepOutcome);
+
+  const clearMaskOverlay = () => {
+    edgeSamMaskRef.current = null;
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) {
+      return;
+    }
+    const context = resizeAndClear2dCanvas(maskCanvas, viewport.width, viewport.height);
+    context.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+  };
+
+  const renderMaskOverlay = (mask: EdgeSamMask | null, nextImageRect: ImageRect | null) => {
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) {
+      return;
+    }
+    const context = resizeAndClear2dCanvas(maskCanvas, viewport.width, viewport.height);
+    if (!mask || !nextImageRect || !display.showEdgeSamMask) {
+      return;
+    }
+
+    const maskImage = context.createImageData(mask.width, mask.height);
+    for (let index = 0; index < mask.data.length; index += 1) {
+      const outputOffset = index * 4;
+      maskImage.data[outputOffset] = 80;
+      maskImage.data[outputOffset + 1] = 210;
+      maskImage.data[outputOffset + 2] = 255;
+      maskImage.data[outputOffset + 3] = mask.data[index];
+    }
+
+    const source = document.createElement("canvas");
+    source.width = mask.width;
+    source.height = mask.height;
+    const sourceContext = source.getContext("2d");
+    if (!sourceContext) {
+      return;
+    }
+    sourceContext.putImageData(maskImage, 0, 0);
+    context.globalAlpha = 0.5;
+    context.drawImage(
+      source,
+      0,
+      0,
+      mask.validWidth,
+      mask.validHeight,
+      nextImageRect.x,
+      nextImageRect.y,
+      nextImageRect.width,
+      nextImageRect.height,
+    );
+    context.globalAlpha = 1;
+  };
+
+  const resizeMaskForHistory = (mask: EdgeSamMask, imageResource: ImageResource) => {
+    const source = document.createElement("canvas");
+    source.width = mask.width;
+    source.height = mask.height;
+    const sourceContext = source.getContext("2d");
+    const target = document.createElement("canvas");
+    target.width = imageResource.width;
+    target.height = imageResource.height;
+    const targetContext = target.getContext("2d");
+    if (!sourceContext || !targetContext) {
+      return null;
+    }
+
+    const maskImage = sourceContext.createImageData(mask.width, mask.height);
+    for (let index = 0; index < mask.data.length; index += 1) {
+      const outputOffset = index * 4;
+      maskImage.data[outputOffset] = 255;
+      maskImage.data[outputOffset + 1] = 255;
+      maskImage.data[outputOffset + 2] = 255;
+      maskImage.data[outputOffset + 3] = mask.data[index];
+    }
+    sourceContext.putImageData(maskImage, 0, 0);
+    targetContext.drawImage(source, 0, 0, mask.validWidth, mask.validHeight, 0, 0, imageResource.width, imageResource.height);
+
+    const alpha = targetContext.getImageData(0, 0, imageResource.width, imageResource.height).data;
+    const resizedMask = new Uint8Array(imageResource.width * imageResource.height);
+    for (let index = 0; index < resizedMask.length; index += 1) {
+      resizedMask[index] = alpha[index * 4 + 3];
+    }
+    return resizedMask;
+  };
 
   const renderHistoryOverlay = (engine: Engine, nextImageRect: ImageRect | null) => {
     const physicalRatio = window.devicePixelRatio || 1;
@@ -160,6 +257,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!image) {
       preprocessPreviewRef.current = null;
       heatmapRef.current = null;
+      edgeSamImageTokenRef.current += 1;
+      clearMaskOverlay();
       setImageRect(null);
       return;
     }
@@ -172,7 +271,8 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       const heatmapCanvas = heatmapCanvasRef.current;
       const historyCanvas = historyCanvasRef.current;
       const preprocessCanvas = preprocessCanvasRef.current;
-      if (!heatmapCanvas || !historyCanvas || !preprocessCanvas || initStartedRef.current) {
+      const maskCanvas = maskCanvasRef.current;
+      if (!heatmapCanvas || !historyCanvas || !preprocessCanvas || !maskCanvas || initStartedRef.current) {
         return;
       }
       initStartedRef.current = true;
@@ -180,6 +280,15 @@ export function SimulationProvider({ children }: PropsWithChildren) {
         setLoadingState("webgpu");
         const engine = await createEngine(heatmapCanvas, historyCanvas, preprocessCanvas);
         engineRef.current = engine;
+        const loadedImage = useSimulationStore.getState().image;
+        if (loadedImage) {
+          engine.preprocessor.setSourceImage(loadedImage.bitmap);
+          engine.edgeSamPreprocessor.setSourceImage(loadedImage.bitmap);
+          engine.historyRenderer.initialize(loadedImage.width, loadedImage.height);
+          void engine.edgeSamPreprocessor.run().then((input) => engine.edgeSamSession.setImage(input)).catch((error) => {
+            console.error("EdgeSAM image embedding failed.", error);
+          });
+        }
         setWebgpuAvailable(true);
         setLoadingState("model");
         setLoadingState("ready");
@@ -195,9 +304,41 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     if (image && engineRef.current) {
       engineRef.current.preprocessor.setSourceImage(image.bitmap);
+      engineRef.current.edgeSamPreprocessor.setSourceImage(image.bitmap);
       engineRef.current.historyRenderer.initialize(image.width, image.height);
+      edgeSamMaskRef.current = null;
+      renderMaskOverlay(null, imageRect);
       renderHistoryOverlay(engineRef.current, imageRect);
     }
+  }, [image, imageRect]);
+
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine || !image) {
+      return;
+    }
+
+    const token = edgeSamImageTokenRef.current + 1;
+    edgeSamImageTokenRef.current = token;
+    let cancelled = false;
+
+    const embedImage = async () => {
+      try {
+        const preprocessed = await engine.edgeSamPreprocessor.run();
+        await engine.edgeSamSession.setImage(preprocessed);
+        if (!cancelled && edgeSamImageTokenRef.current === token) {
+          edgeSamMaskRef.current = null;
+          renderMaskOverlay(null, imageRect);
+        }
+      } catch (error) {
+        console.error("EdgeSAM image embedding failed.", error);
+      }
+    };
+
+    void embedImage();
+    return () => {
+      cancelled = true;
+    };
   }, [image, imageRect]);
 
   // Detect panel boxes whenever a new page image is loaded so the overlay can visualize them immediately.
@@ -261,8 +402,9 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     const preprocessCanvas = preprocessCanvasRef.current;
     const historyCanvas = historyCanvasRef.current;
     const heatmapCanvas = heatmapCanvasRef.current;
+    const maskCanvas = maskCanvasRef.current;
     const engine = engineRef.current;
-    if (!preprocessCanvas || !historyCanvas || !heatmapCanvas) {
+    if (!preprocessCanvas || !historyCanvas || !heatmapCanvas || !maskCanvas) {
       return;
     }
 
@@ -279,10 +421,15 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     heatmapCanvas.height = Math.max(1, Math.floor(viewport.height * ratio));
     heatmapCanvas.style.width = `${viewport.width}px`;
     heatmapCanvas.style.height = `${viewport.height}px`;
+    maskCanvas.width = Math.max(1, Math.floor(viewport.width * ratio));
+    maskCanvas.height = Math.max(1, Math.floor(viewport.height * ratio));
+    maskCanvas.style.width = `${viewport.width}px`;
+    maskCanvas.style.height = `${viewport.height}px`;
     engine?.preprocessRenderer.resize(preprocessCanvas.width, preprocessCanvas.height);
     engine?.heatmapRenderer.resize(heatmapCanvas.width, heatmapCanvas.height);
     engine?.historyRenderer.resize(historyCanvas.width, historyCanvas.height);
-  }, [viewport.width, viewport.height]);
+    renderMaskOverlay(edgeSamMaskRef.current, imageRect);
+  }, [viewport.width, viewport.height, imageRect, display.showEdgeSamMask]);
 
   // Redraw the base image only when its source or fitted rectangle changes.
   useEffect(() => {
@@ -367,8 +514,32 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     });
   }, [image, imageRect, currentRoi, display.showHeatmap]);
 
+  useEffect(() => {
+    renderMaskOverlay(edgeSamMaskRef.current, imageRect);
+  }, [imageRect, display.showEdgeSamMask]);
+
   const filterCandidatesByThreshold = (candidates: Candidate[]) =>
     candidates.filter((candidate) => candidate.finalScore >= settings.thresholdRatio);
+
+  const updateEdgeSamMask = async (engine: Engine, fixation: Point) => {
+    try {
+      const prediction = await engine.edgeSamSession.predict({
+        points: [{ x: fixation.x, y: fixation.y, label: 1 }],
+      });
+      const bestMask = prediction.masks.reduce<EdgeSamMask | null>(
+        (best, mask) => (!best || mask.score > best.score ? mask : best),
+        null,
+      );
+      edgeSamMaskRef.current = bestMask;
+      renderMaskOverlay(bestMask, imageRect);
+      return bestMask;
+    } catch (error) {
+      console.error("EdgeSAM mask prediction failed.", error);
+      edgeSamMaskRef.current = null;
+      renderMaskOverlay(null, imageRect);
+      return null;
+    }
+  };
 
   const runStepOnce = async (engine: Engine, imageResource: ImageResource, roi: RoiRect, fixation: Point) => {
     const input = await engine.preprocessor.run(roi, fixation, imageResource.height, settings);
@@ -406,12 +577,18 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     if (!engine || !image) {
       return;
     }
-    engine.historyRenderer.accumulateFixation(
-      fixation.x,
-      fixation.y,
-      image.height * settings.historySigmaRatio,
-      settings.historyDecay,
-    );
+    const mask = await updateEdgeSamMask(engine, fixation);
+    const historyMask = settings.historyMode === "mask" && mask ? resizeMaskForHistory(mask, image) : null;
+    if (historyMask) {
+      engine.historyRenderer.accumulateMask(historyMask, settings.historyDecay);
+    } else {
+      engine.historyRenderer.accumulateFixation(
+        fixation.x,
+        fixation.y,
+        image.height * settings.historySigmaRatio,
+        settings.historyDecay,
+      );
+    }
     renderHistoryOverlay(engine, imageRect);
 
     let stepResult = await runStepOnce(engine, image, initialRoi, fixation);
@@ -450,13 +627,19 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     const currentPanel = orderedPanels[currentPanelIndex];
     const nextPanel = orderedPanels[currentPanelIndex + 1] ?? null;
 
-    engine.historyRenderer.accumulateFixation(
-      fixation.x,
-      fixation.y,
-      image.height * settings.historySigmaRatio,
-      settings.historyDecay,
-      currentPanel.rect,
-    );
+    const mask = await updateEdgeSamMask(engine, fixation);
+    const historyMask = settings.historyMode === "mask" && mask ? resizeMaskForHistory(mask, image) : null;
+    if (historyMask) {
+      engine.historyRenderer.accumulateMask(historyMask, settings.historyDecay);
+    } else {
+      engine.historyRenderer.accumulateFixation(
+        fixation.x,
+        fixation.y,
+        image.height * settings.historySigmaRatio,
+        settings.historyDecay,
+        currentPanel.rect,
+      );
+    }
     renderHistoryOverlay(engine, imageRect);
 
     const localEval = await runStepOnce(engine, image, initialRoi, fixation);
@@ -552,6 +735,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       historyCanvasRef,
       preprocessCanvasRef,
       heatmapCanvasRef,
+      maskCanvasRef,
     },
     exportBuffers: {
       preprocessPreview: preprocessPreviewRef.current,

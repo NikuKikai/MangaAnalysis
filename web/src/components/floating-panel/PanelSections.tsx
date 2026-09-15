@@ -128,20 +128,38 @@ export function PanelSections({
           </IconButton>
         }
       >
-        <SliderControl
-          label={t("panel.sliders.sigma.label")}
-          title={t("panel.sliders.sigma.tooltip", {
-            imageHeight: imageHeightLabel,
-            ratio: settings.historySigmaRatio.toFixed(3),
-            pixels: formatPixels(historySigmaPx, t("panel.unknown")),
-          })}
-          min="0.01"
-          max="0.12"
-          step="0.001"
-          value={settings.historySigmaRatio}
-          displayValue={settings.historySigmaRatio.toFixed(3)}
-          onChange={(value) => updateSetting("historySigmaRatio", value)}
-        />
+        <div className="text-mode-group" role="group" aria-label={t("panel.sections.history")}>
+          <button
+            type="button"
+            className={`text-mode-button${settings.historyMode === "gaussian" ? " is-active" : ""}`}
+            onClick={() => updateSetting("historyMode", "gaussian")}
+          >
+            {t("panel.buttons.gaussianHistoryMode")}
+          </button>
+          <button
+            type="button"
+            className={`text-mode-button${settings.historyMode === "mask" ? " is-active" : ""}`}
+            onClick={() => updateSetting("historyMode", "mask")}
+          >
+            {t("panel.buttons.maskHistoryMode")}
+          </button>
+        </div>
+        {settings.historyMode === "gaussian" ? (
+          <SliderControl
+            label={t("panel.sliders.sigma.label")}
+            title={t("panel.sliders.sigma.tooltip", {
+              imageHeight: imageHeightLabel,
+              ratio: settings.historySigmaRatio.toFixed(3),
+              pixels: formatPixels(historySigmaPx, t("panel.unknown")),
+            })}
+            min="0.01"
+            max="0.12"
+            step="0.001"
+            value={settings.historySigmaRatio}
+            displayValue={settings.historySigmaRatio.toFixed(3)}
+            onChange={(value) => updateSetting("historySigmaRatio", value)}
+          />
+        ) : null}
         <SliderControl
           label={t("panel.sliders.hist.label")}
           title={t("panel.sliders.hist.tooltip", { value: settings.historyAlpha.toFixed(1) })}
@@ -163,6 +181,15 @@ export function PanelSections({
           onChange={(value) => updateSetting("historyDecay", value)}
         />
       </SettingsSection>
+
+      <SettingsSection
+        title={t("panel.sections.edgesam")}
+        toggle={
+          <IconButton active={display.showEdgeSamMask} label={t("panel.buttons.toggleEdgeSamMask")} onClick={() => toggleDisplay("showEdgeSamMask")}>
+            <IoEyeOutline />
+          </IconButton>
+        }
+      />
 
       <SettingsSection
         title={t("panel.sections.selector")}
