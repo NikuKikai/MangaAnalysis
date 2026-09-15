@@ -26,6 +26,7 @@ export function FloatingPanel() {
     strategy,
     display,
     settings,
+    edgeSamStatus,
     loadImageFile,
     setMode,
     setStrategy,
@@ -47,6 +48,7 @@ export function FloatingPanel() {
         strategy: state.strategy,
         display: state.display,
         settings: state.settings,
+        edgeSamStatus: state.edgeSamStatus,
         loadImageFile: state.loadImageFile,
         setMode: state.setMode,
         setStrategy: state.setStrategy,
@@ -114,6 +116,7 @@ export function FloatingPanel() {
               strategy={strategy}
               display={display}
               settings={settings}
+              edgeSamStatus={edgeSamStatus}
               setStrategy={setStrategy}
               updateSetting={updateSetting}
               toggleDisplay={toggleDisplay}

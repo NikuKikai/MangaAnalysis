@@ -110,3 +110,4 @@ export type FluidityAnalysis = {
 };
 
 export type LoadingPhase = "boot" | "webgpu" | "model" | "ready" | "error";
+export type EdgeSamStatus = "idle" | "loading" | "ready" | "unavailable" | "error";

@@ -35,7 +35,7 @@ type Engine = {
   preprocessRenderer: PreprocessRenderer;
   candidateSelector: GpuCandidateSelector;
   session: SaliencySession;
-  edgeSamSession: EdgeSamSession;
+  edgeSamSession: EdgeSamSession | null;
 };
 
 type SimulationEngineContextValue = {
@@ -88,7 +88,12 @@ async function createEngine(
   const preprocessRenderer = new PreprocessRenderer(device, preprocessCanvas);
   const candidateSelector = new GpuCandidateSelector(device);
   const session = await SaliencySession.create();
-  const edgeSamSession = await EdgeSamSession.create();
+  let edgeSamSession: EdgeSamSession | null = null;
+  try {
+    edgeSamSession = await EdgeSamSession.create();
+  } catch (error) {
+    console.warn("EdgeSAM model loading failed.", error);
+  }
   return {
     device,
     preprocessor,
@@ -141,6 +146,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
   const setError = useSimulationStore((state) => state.setError);
   const setPanelDetection = useSimulationStore((state) => state.setPanelDetection);
   const setWebgpuAvailable = useSimulationStore((state) => state.setWebgpuAvailable);
+  const setEdgeSamStatus = useSimulationStore((state) => state.setEdgeSamStatus);
   const applyStepOutcome = useSimulationStore((state) => state.applyStepOutcome);
 
   const clearMaskOverlay = () => {
@@ -280,13 +286,17 @@ export function SimulationProvider({ children }: PropsWithChildren) {
         setLoadingState("webgpu");
         const engine = await createEngine(heatmapCanvas, historyCanvas, preprocessCanvas);
         engineRef.current = engine;
+        setEdgeSamStatus(engine.edgeSamSession ? "loading" : "unavailable", engine.edgeSamSession ? null : "EdgeSAM models are missing or failed to load.");
         const loadedImage = useSimulationStore.getState().image;
-        if (loadedImage) {
+        if (loadedImage && engine.edgeSamSession) {
           engine.preprocessor.setSourceImage(loadedImage.bitmap);
           engine.edgeSamPreprocessor.setSourceImage(loadedImage.bitmap);
           engine.historyRenderer.initialize(loadedImage.width, loadedImage.height);
-          void engine.edgeSamPreprocessor.run().then((input) => engine.edgeSamSession.setImage(input)).catch((error) => {
+          void engine.edgeSamPreprocessor.run().then((input) => engine.edgeSamSession?.setImage(input)).then(() => {
+            setEdgeSamStatus("ready");
+          }).catch((error) => {
             console.error("EdgeSAM image embedding failed.", error);
+            setEdgeSamStatus("error", "EdgeSAM image embedding failed.");
           });
         }
         setWebgpuAvailable(true);
@@ -298,7 +308,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
       }
     };
     void initialize();
-  }, [setError, setLoadingState, setWebgpuAvailable]);
+  }, [setEdgeSamStatus, setError, setLoadingState, setWebgpuAvailable]);
 
   // Push the latest decoded bitmap into the GPU preprocessor source texture.
   useEffect(() => {
@@ -314,7 +324,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
 
   useEffect(() => {
     const engine = engineRef.current;
-    if (!engine || !image) {
+    if (!engine || !image || !engine.edgeSamSession) {
       return;
     }
 
@@ -324,14 +334,19 @@ export function SimulationProvider({ children }: PropsWithChildren) {
 
     const embedImage = async () => {
       try {
+        setEdgeSamStatus("loading");
         const preprocessed = await engine.edgeSamPreprocessor.run();
-        await engine.edgeSamSession.setImage(preprocessed);
+        await engine.edgeSamSession?.setImage(preprocessed);
         if (!cancelled && edgeSamImageTokenRef.current === token) {
+          setEdgeSamStatus("ready");
           edgeSamMaskRef.current = null;
           renderMaskOverlay(null, imageRect);
         }
       } catch (error) {
         console.error("EdgeSAM image embedding failed.", error);
+        if (!cancelled) {
+          setEdgeSamStatus("error", "EdgeSAM image embedding failed.");
+        }
       }
     };
 
@@ -339,7 +354,7 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [image, imageRect]);
+  }, [image, imageRect, setEdgeSamStatus]);
 
   // Detect panel boxes whenever a new page image is loaded so the overlay can visualize them immediately.
   useEffect(() => {
@@ -522,6 +537,11 @@ export function SimulationProvider({ children }: PropsWithChildren) {
     candidates.filter((candidate) => candidate.finalScore >= settings.thresholdRatio);
 
   const updateEdgeSamMask = async (engine: Engine, fixation: Point) => {
+    if (!engine.edgeSamSession) {
+      edgeSamMaskRef.current = null;
+      renderMaskOverlay(null, imageRect);
+      return null;
+    }
     try {
       const prediction = await engine.edgeSamSession.predict({
         points: [{ x: fixation.x, y: fixation.y, label: 1 }],

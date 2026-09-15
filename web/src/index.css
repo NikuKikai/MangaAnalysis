@@ -313,6 +313,11 @@ svg {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.text-mode-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
 .text-mode-button.is-active {
   color: #ffd49b;
   background: rgba(255, 179, 88, 0.12);

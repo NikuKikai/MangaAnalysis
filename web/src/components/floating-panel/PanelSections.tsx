@@ -1,6 +1,6 @@
 import { IoEyeOutline } from "react-icons/io5";
 import { useTranslation } from "react-i18next";
-import type { DisplayState, RoiRect, SimulationSettings, SimulationStrategy } from "../../types/simulation";
+import type { DisplayState, EdgeSamStatus, RoiRect, SimulationSettings, SimulationStrategy } from "../../types/simulation";
 import { IconButton } from "../IconButton";
 import { SettingsSection } from "./SettingsSection";
 import { SliderControl } from "./SliderControl";
@@ -11,6 +11,7 @@ type PanelSectionsProps = {
   strategy: SimulationStrategy;
   display: DisplayState;
   settings: SimulationSettings;
+  edgeSamStatus: EdgeSamStatus;
   setStrategy: (strategy: SimulationStrategy) => void;
   updateSetting: <K extends keyof SimulationSettings>(key: K, value: SimulationSettings[K]) => void;
   toggleDisplay: (key: keyof DisplayState) => void;
@@ -26,6 +27,7 @@ export function PanelSections({
   strategy,
   display,
   settings,
+  edgeSamStatus,
   setStrategy,
   updateSetting,
   toggleDisplay,
@@ -49,6 +51,7 @@ export function PanelSections({
     { id: "saliency_only", label: t("panel.buttons.saliencyOnlyStrategy") },
     { id: "panel_guided", label: t("panel.buttons.panelGuidedStrategy") },
   ];
+  const edgeSamReady = edgeSamStatus === "ready";
 
   return (
     <div className="settings-sections">
@@ -121,6 +124,20 @@ export function PanelSections({
       </SettingsSection>
 
       <SettingsSection
+        title={t("panel.sections.edgesam")}
+        toggle={
+          <IconButton
+            active={display.showEdgeSamMask && edgeSamReady}
+            disabled={!edgeSamReady}
+            label={t("panel.buttons.toggleEdgeSamMask")}
+            onClick={() => toggleDisplay("showEdgeSamMask")}
+          >
+            <IoEyeOutline />
+          </IconButton>
+        }
+      />
+
+      <SettingsSection
         title={t("panel.sections.history")}
         toggle={
           <IconButton active={display.showHistoryHeatmap} label={t("panel.buttons.toggleHistory")} onClick={() => toggleDisplay("showHistoryHeatmap")}>
@@ -139,6 +156,7 @@ export function PanelSections({
           <button
             type="button"
             className={`text-mode-button${settings.historyMode === "mask" ? " is-active" : ""}`}
+            disabled={!edgeSamReady}
             onClick={() => updateSetting("historyMode", "mask")}
           >
             {t("panel.buttons.maskHistoryMode")}
@@ -181,15 +199,6 @@ export function PanelSections({
           onChange={(value) => updateSetting("historyDecay", value)}
         />
       </SettingsSection>
-
-      <SettingsSection
-        title={t("panel.sections.edgesam")}
-        toggle={
-          <IconButton active={display.showEdgeSamMask} label={t("panel.buttons.toggleEdgeSamMask")} onClick={() => toggleDisplay("showEdgeSamMask")}>
-            <IoEyeOutline />
-          </IconButton>
-        }
-      />
 
       <SettingsSection
         title={t("panel.sections.selector")}

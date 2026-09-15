@@ -12,6 +12,7 @@ import type {
   RoiRect,
   SimulationStrategy,
   SimulationSettings,
+  EdgeSamStatus,
 } from "../types/simulation";
 
 const defaultSettings: SimulationSettings = {
@@ -42,6 +43,8 @@ type SimulationStore = {
   loadingPhase: LoadingPhase;
   errorMessage: string | null;
   webgpuAvailable: boolean;
+  edgeSamStatus: EdgeSamStatus;
+  edgeSamErrorMessage: string | null;
 
   // Loaded page resource and initial ROI selection mode.
   image: ImageResource | null;
@@ -73,6 +76,7 @@ type SimulationStore = {
   setLoadingState: (phase: LoadingPhase) => void;
   setError: (message: string) => void;
   setWebgpuAvailable: (available: boolean) => void;
+  setEdgeSamStatus: (status: EdgeSamStatus, message?: string | null) => void;
   setImage: (image: ImageResource | null) => void;
   loadImageFile: (file: File | null) => Promise<void>;
   setMode: (mode: MouseMode) => void;
@@ -100,6 +104,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
   loadingPhase: "boot",
   errorMessage: null,
   webgpuAvailable: false,
+  edgeSamStatus: "idle",
+  edgeSamErrorMessage: null,
 
   // Loaded page resource and initial ROI selection mode.
   image: null,
@@ -139,6 +145,25 @@ export const useSimulationStore = create<SimulationStore>((set, get) => ({
       errorMessage: message,
     }),
   setWebgpuAvailable: (available) => set({ webgpuAvailable: available }),
+  setEdgeSamStatus: (status, message = null) =>
+    set((state) => ({
+      edgeSamStatus: status,
+      edgeSamErrorMessage: message,
+      settings:
+        (status === "unavailable" || status === "error") && state.settings.historyMode === "mask"
+          ? {
+              ...state.settings,
+              historyMode: "gaussian",
+            }
+          : state.settings,
+      display:
+        status === "unavailable" || status === "error"
+          ? {
+              ...state.display,
+              showEdgeSamMask: false,
+            }
+          : state.display,
+    })),
   setImage: (image) =>
     set({
       image,

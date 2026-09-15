@@ -8,6 +8,11 @@ docs/
 
 web/.npm-cache/
 web/node_modules/
+web/public/models/edge_sam_3x_encoder.onnx
+web/public/models/edge_sam_3x_decoder.onnx
+
+third_party/edgesam/
+src/edgesam/weights/
 
 # Python-generated files
 __pycache__/
